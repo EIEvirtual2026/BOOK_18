@@ -1,0 +1,2413 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Libro Digital - Escuela de Idiomas del Ejército</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Source+Sans+Pro:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        emi: { blue: '#003DA5', dark: '#001B44', navy: '#0A1628', gold: '#FFD700', lightgold: '#FFF3C4', steel: '#1B3A6B' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --emi-blue: #003DA5;
+            --emi-dark: #001B44;
+            --emi-navy: #0A1628;
+            --emi-gold: #FFD700;
+            --emi-lightgold: #FFF3C4;
+            --emi-steel: #1B3A6B;
+            --flip-duration: 0.9s;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Source Sans Pro', sans-serif;
+            background: var(--emi-navy);
+            overflow: hidden;
+            height: 100vh;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        @media print { html, body { display: none !important; visibility: hidden !important; } }
+
+        .bg-animated {
+            background:
+                radial-gradient(ellipse at 15% 80%, rgba(0,61,165,0.12) 0%, transparent 50%),
+                radial-gradient(ellipse at 85% 20%, rgba(255,215,0,0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(0,27,68,0.8) 0%, var(--emi-navy) 100%);
+        }
+
+        .particle {
+            position: fixed;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: floatUp var(--duration) var(--delay) infinite linear;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(100vh) scale(0); opacity: 0; }
+            15% { opacity: var(--opacity); transform: translateY(85vh) scale(1); }
+            85% { opacity: var(--opacity); }
+            100% { transform: translateY(-5vh) scale(0.5); opacity: 0; }
+        }
+
+        /* === VISOR === */
+        .book-viewport {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            cursor: default;
+        }
+        .book-viewport.pan-mode { cursor: grab; }
+        .book-viewport.pan-mode.panning { cursor: grabbing; }
+
+        .book-transform-wrapper {
+            transform-origin: center center;
+            transition: transform 0.25s ease;
+            display: inline-block;
+            width: 100%;
+        }
+        .book-transform-wrapper.no-transition { transition: none !important; }
+
+        .book-wrapper { perspective: 2200px; }
+
+        .book {
+            position: relative;
+            transform-style: preserve-3d;
+        }
+
+        .book-page {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #f8f4ec;
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.08);
+        }
+        .book-page img {
+            width: 100%; height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+            -webkit-user-drag: none;
+        }
+        .book-page.empty-page { background: linear-gradient(135deg, #1a2744, #0a1628); }
+
+        .spine-shadow {
+            position: absolute; top: 0; left: 50%;
+            transform: translateX(-50%);
+            width: 50px; height: 100%;
+            background: linear-gradient(to right,
+                rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.15) 25%,
+                rgba(0,0,0,0.03) 45%, rgba(0,0,0,0.03) 55%,
+                rgba(0,0,0,0.15) 75%, rgba(0,0,0,0.35) 100%
+            );
+            z-index: 20; pointer-events: none;
+        }
+
+        .page-inner-shadow-l {
+            position: absolute; top: 0; left: 0;
+            width: 40px; height: 100%;
+            background: linear-gradient(to right, rgba(0,0,0,0.12), transparent);
+            z-index: 3; pointer-events: none;
+        }
+        .page-inner-shadow-r {
+            position: absolute; top: 0; right: 0;
+            width: 40px; height: 100%;
+            background: linear-gradient(to left, rgba(0,0,0,0.08), transparent);
+            z-index: 3; pointer-events: none;
+        }
+
+        /* === FLECHAS DE NAVEGACIÓN FIJAS === */
+        .nav-arrow {
+            position: absolute; top: 50%;
+            transform: translateY(-50%);
+            width: 52px; height: 80px;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, var(--emi-blue), var(--emi-steel));
+            border: 1px solid rgba(255,215,0,0.35);
+            color: var(--emi-gold);
+            border-radius: 10px;
+            cursor: pointer; z-index: 60;
+            transition: all 0.3s ease;
+            font-size: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .nav-arrow:hover {
+            background: linear-gradient(135deg, var(--emi-steel), var(--emi-blue));
+            border-color: var(--emi-gold);
+            box-shadow: 0 0 25px rgba(255,215,0,0.35), 0 4px 20px rgba(0,0,0,0.5);
+            transform: translateY(-50%) scale(1.06);
+        }
+        .nav-arrow:active { transform: translateY(-50%) scale(0.94); }
+        .nav-arrow.disabled { opacity: 0.25; cursor: not-allowed; pointer-events: none; }
+
+        /* Posición fija: siempre a los bordes del viewport */
+        .nav-prev { left: 18px; }
+        .nav-next { right: 18px; }
+
+        /* === VOLTEO REALISTA DE PÁGINA === */
+        .flip-page {
+            position: absolute; top: 0;
+            height: 100%;
+            transform-style: preserve-3d;
+            z-index: 30;
+        }
+
+        /* Hoja que voltea hacia la izquierda (avanzar) */
+        .flip-page.flip-right {
+            left: 50%; width: 50%;
+            transform-origin: left center;
+        }
+
+        /* Hoja que voltea hacia la derecha (retroceder) */
+        .flip-page.flip-left {
+            left: 0; width: 50%;
+            transform-origin: right center;
+        }
+
+        .flip-front, .flip-back {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            background: #f8f4ec;
+            overflow: hidden;
+            border-radius: 2px;
+        }
+        .flip-front img, .flip-back img {
+            width: 100%; height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+            -webkit-user-drag: none;
+        }
+        .flip-back { transform: rotateY(180deg); }
+
+        /* Gradiente de curvado en la cara frontal */
+        .fold-gradient-front {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none; z-index: 2;
+        }
+        /* Sombra en el lomo para la cara que voltea a la izquierda */
+        .flip-right .fold-gradient-front {
+            background: linear-gradient(to right, rgba(0,0,0,0.08), transparent 50%);
+        }
+        /* Sombra en el lomo para la cara que voltea a la derecha */
+        .flip-left .fold-gradient-front {
+            background: linear-gradient(to left, rgba(0,0,0,0.08), transparent 50%);
+        }
+
+        /* Gradiente de curvado en la cara trasera */
+        .fold-gradient-back {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none; z-index: 2;
+        }
+        .flip-right .fold-gradient-back {
+            background: linear-gradient(to left, rgba(0,0,0,0.12), transparent 40%);
+        }
+        .flip-left .fold-gradient-back {
+            background: linear-gradient(to right, rgba(0,0,0,0.12), transparent 40%);
+        }
+
+        /* Animaciones de volteo - curva realista */
+        .flip-page.flipping-forward {
+            animation: flipForward var(--flip-duration) cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+        }
+        .flip-page.flipping-backward {
+            animation: flipBackward var(--flip-duration) cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+        }
+
+        @keyframes flipForward {
+            0%   { transform: rotateY(0deg); }
+            100% { transform: rotateY(-180deg); }
+        }
+        @keyframes flipBackward {
+            0%   { transform: rotateY(0deg); }
+            100% { transform: rotateY(180deg); }
+        }
+
+        /* Sombra bajo la página que voltea (se revela debajo) */
+        .flip-under-shadow {
+            position: absolute; top: 0;
+            height: 100%;
+            pointer-events: none; z-index: 22;
+            animation: underShadowPulse var(--flip-duration) ease forwards;
+        }
+        .flip-under-shadow.on-right {
+            left: 50%; width: 50%;
+            background: linear-gradient(to left, rgba(0,0,0,0.2), transparent 60%);
+        }
+        .flip-under-shadow.on-left {
+            left: 0; width: 50%;
+            background: linear-gradient(to right, rgba(0,0,0,0.2), transparent 60%);
+        }
+
+        @keyframes underShadowPulse {
+            0%   { opacity: 0; }
+            25%  { opacity: 1; }
+            75%  { opacity: 0.6; }
+            100% { opacity: 0; }
+        }
+
+        /* Sombra paralela que se mueve con la página */
+        .flip-cast-shadow {
+            position: absolute; top: 0;
+            height: 100%;
+            pointer-events: none; z-index: 22;
+            animation: castShadowForward var(--flip-duration) ease forwards;
+        }
+        .flip-cast-shadow.to-left {
+            left: 0;
+            background: linear-gradient(to right, rgba(0,0,0,0.15), transparent 40%);
+        }
+        .flip-cast-shadow.to-right {
+            right: 0;
+            background: linear-gradient(to left, rgba(0,0,0,0.15), transparent 40%);
+        }
+
+        @keyframes castShadowForward {
+            0%   { opacity: 0; width: 0; }
+            30%  { opacity: 1; }
+            60%  { opacity: 0.5; width: 35%; }
+            100% { opacity: 0; width: 0; }
+        }
+
+        /* === MARCA DE AGUA === */
+        .watermark-overlay {
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            pointer-events: none;
+            z-index: 10;
+            overflow: hidden;
+            transform: rotate(-35deg);
+        }
+        .watermark-line {
+            display: flex; white-space: nowrap; margin-bottom: 90px;
+        }
+        .watermark-line span {
+            font-family: 'Playfair Display', serif;
+            font-weight: 900; font-size: 18px;
+            letter-spacing: 5px; text-transform: uppercase;
+            padding: 0 35px;
+            background: linear-gradient(135deg, rgba(0,61,165,0.06), rgba(255,215,0,0.08));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .watermark-line:nth-child(even) { margin-left: 180px; }
+
+        .security-layer {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 15; pointer-events: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='transparent'/%3E%3C/svg%3E");
+        }
+
+        .blur-protection { filter: blur(40px) !important; transition: filter 0.2s ease; }
+
+        /* === MINIATURAS === */
+        .thumb-item {
+            width: 56px; height: 75px;
+            border: 2px solid rgba(255,215,0,0.2);
+            border-radius: 4px; overflow: hidden;
+            cursor: pointer; transition: all 0.3s ease;
+            flex-shrink: 0; position: relative;
+        }
+        .thumb-item:hover { border-color: rgba(255,215,0,0.6); transform: scale(1.08); }
+        .thumb-item.active { border-color: var(--emi-gold); box-shadow: 0 0 12px rgba(255,215,0,0.4); }
+        .thumb-item img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+        .thumb-item .thumb-label {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: rgba(0,27,68,0.9); color: var(--emi-gold);
+            font-size: 7px; text-align: center; padding: 2px; font-weight: 600;
+        }
+
+        .toast-msg {
+            position: fixed; bottom: 120px; left: 50%;
+            transform: translateX(-50%) translateY(30px);
+            background: linear-gradient(135deg, var(--emi-dark), var(--emi-blue));
+            color: var(--emi-gold); padding: 14px 28px; border-radius: 10px;
+            border: 1px solid rgba(255,215,0,0.4);
+            opacity: 0; transition: all 0.4s cubic-bezier(0.4,0,0.2,1);
+            z-index: 10000; font-weight: 600; font-size: 14px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5); pointer-events: none;
+        }
+        .toast-msg.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        .top-bar {
+            background: linear-gradient(90deg, var(--emi-dark) 0%, var(--emi-blue) 50%, var(--emi-dark) 100%);
+            border-bottom: 2px solid var(--emi-gold);
+        }
+        .bottom-bar {
+            background: linear-gradient(90deg, var(--emi-dark) 0%, var(--emi-blue) 50%, var(--emi-dark) 100%);
+            border-top: 2px solid var(--emi-gold);
+        }
+
+        .btn-emi {
+            background: linear-gradient(135deg, var(--emi-blue), var(--emi-steel));
+            border: 1px solid rgba(255,215,0,0.4);
+            color: var(--emi-gold); transition: all 0.3s ease; cursor: pointer;
+        }
+        .btn-emi:hover {
+            background: linear-gradient(135deg, var(--emi-steel), var(--emi-blue));
+            border-color: var(--emi-gold); box-shadow: 0 0 15px rgba(255,215,0,0.3);
+        }
+        .btn-emi.active-tool {
+            background: linear-gradient(135deg, var(--emi-gold), #e6c200) !important;
+            color: var(--emi-dark) !important; border-color: var(--emi-gold) !important;
+            box-shadow: 0 0 15px rgba(255,215,0,0.5);
+        }
+
+        .page-indicator {
+            background: rgba(0,27,68,0.8); border: 1px solid rgba(255,215,0,0.3);
+            border-radius: 20px; padding: 6px 18px;
+            color: var(--emi-gold); font-size: 13px; font-weight: 600;
+        }
+
+        .book-edge-right {
+            position: absolute; top: 3px; right: -5px;
+            width: 8px; height: calc(100% - 6px);
+            background: repeating-linear-gradient(to bottom, #e8e0d0 0px, #e8e0d0 2px, #d8d0c0 2px, #d8d0c0 4px);
+            border-radius: 0 3px 3px 0; z-index: -1; box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+        }
+        .book-edge-bottom {
+            position: absolute; bottom: -5px; left: 3px;
+            width: calc(100% - 6px); height: 8px;
+            background: repeating-linear-gradient(to right, #e8e0d0 0px, #e8e0d0 2px, #d8d0c0 2px, #d8d0c0 4px);
+            border-radius: 0 0 3px 3px; z-index: -1; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .sidebar-panel {
+            background: linear-gradient(180deg, var(--emi-dark), var(--emi-navy));
+            border-left: 2px solid rgba(255,215,0,0.2);
+            transition: transform 0.4s cubic-bezier(0.4,0,0.2,1);
+        }
+        .sidebar-panel.closed { transform: translateX(100%); }
+
+        @keyframes goldShimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+        .gold-shimmer {
+            background: linear-gradient(90deg, var(--emi-gold) 0%, #FFF8DC 25%, var(--emi-gold) 50%, #FFF8DC 75%, var(--emi-gold) 100%);
+            background-size: 200% auto; -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent; background-clip: text;
+            animation: goldShimmer 4s linear infinite;
+        }
+
+        .book-glow { box-shadow: 0 0 40px rgba(0,61,165,0.2), 0 0 80px rgba(255,215,0,0.05), 0 20px 60px rgba(0,0,0,0.5); }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--emi-dark); }
+        ::-webkit-scrollbar-thumb { background: var(--emi-blue); border-radius: 3px; }
+
+        .loading-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--emi-navy); display: flex;
+            align-items: center; justify-content: center;
+            flex-direction: column; z-index: 99999; transition: opacity 0.8s ease;
+        }
+        .loading-screen.fade-out { opacity: 0; pointer-events: none; }
+        .loader-ring {
+            width: 60px; height: 60px;
+            border: 3px solid rgba(255,215,0,0.15); border-top: 3px solid var(--emi-gold);
+            border-radius: 50%; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .security-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: flex;
+            align-items: center; justify-content: center; z-index: 99998;
+        }
+        .security-modal-box {
+            background: linear-gradient(135deg, var(--emi-dark), var(--emi-blue));
+            border: 2px solid var(--emi-gold); border-radius: 16px;
+            padding: 40px; max-width: 500px; text-align: center;
+        }
+
+        .page-jump-input {
+            background: var(--emi-dark); border: 1px solid rgba(255,215,0,0.4);
+            color: var(--emi-gold); border-radius: 6px;
+            padding: 4px 8px; width: 56px; text-align: center;
+            font-size: 13px; font-weight: 600; outline: none;
+        }
+        .page-jump-input:focus { border-color: var(--emi-gold); box-shadow: 0 0 8px rgba(255,215,0,0.3); }
+
+        .mode-indicator {
+            position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,27,68,0.9); border: 1px solid rgba(255,215,0,0.4);
+            color: var(--emi-gold); padding: 8px 20px; border-radius: 20px;
+            font-size: 12px; font-weight: 600; z-index: 100;
+            opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
+        }
+        .mode-indicator.visible { opacity: 1; }
+
+        .progress-bar-track { height: 3px; background: rgba(255,215,0,0.15); border-radius: 2px; overflow: hidden; width: 120px; }
+        .progress-bar-fill { height: 100%; background: var(--emi-gold); border-radius: 2px; transition: width 0.4s ease; }
+
+        .thumb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 12px; }
+        .thumb-grid .thumb-item { width: 100%; height: 70px; }
+
+        @media (max-width: 900px) {
+            .nav-prev { left: 8px; }
+            .nav-next { right: 8px; }
+            .hide-mobile { display: none !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .particle { animation: none !important; }
+            .flip-page.flipping-forward,
+            .flip-page.flipping-backward { animation-duration: 0.01s !important; }
+            .gold-shimmer { animation: none !important; }
+        }
+    </style>
+
+    <!-- Librerías para anotación y exportación -->
+    <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <style>
+      /* === HERRAMIENTAS DIDÁCTICAS === */
+      .anno-toolbar {
+        position: fixed; top: 50%; left: 10px; transform: translateY(-50%);
+        background: linear-gradient(180deg, var(--emi-dark), var(--emi-steel));
+        border: 1px solid rgba(255,215,0,0.4); border-radius: 14px;
+        padding: 8px; display: flex; flex-direction: column; gap: 6px; z-index: 60;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+        width: 60px; max-height: calc(100vh - 20px); overflow-y: auto; overflow-x: hidden;
+        scrollbar-width: thin; scrollbar-color: var(--emi-gold) transparent;
+        align-items: center;
+      }
+      .anno-toolbar::-webkit-scrollbar { width: 6px; }
+      .anno-toolbar::-webkit-scrollbar-thumb { background: var(--emi-gold); border-radius: 3px; }
+      .anno-toolbar.hidden { display: none; }
+      .anno-btn {
+        width: 40px; height: 36px; border-radius: 8px; background: var(--emi-navy);
+        color: var(--emi-gold); border: 1px solid rgba(255,215,0,0.2);
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; transition: all .2s; font-size: 14px; flex-shrink: 0;
+      }
+      .anno-btn:hover { background: var(--emi-blue); border-color: var(--emi-gold); }
+      .anno-btn.active { background: var(--emi-gold); color: var(--emi-dark); border-color: var(--emi-gold); }
+      .anno-divider { height: 1px; width: 100%; background: rgba(255,215,0,0.2); margin: 4px 0; flex-shrink: 0; }
+      .anno-color {
+        width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+        border: 2px solid rgba(255,255,255,0.3); margin: 2px auto; flex-shrink: 0;
+      }
+      .anno-color.active { border-color: var(--emi-gold); transform: scale(1.15); }
+      .anno-select {
+        width: 44px; background: var(--emi-dark); color: var(--emi-lightgold);
+        border: 1px solid rgba(255,215,0,0.3); border-radius: 6px;
+        padding: 4px 2px; font-size: 10px; outline: none; flex-shrink: 0;
+        text-align: center; text-align-last: center;
+      }
+      @media (max-height: 700px) {
+        .anno-btn { height: 30px; }
+        .anno-toolbar { gap: 4px; padding: 6px; }
+      }
+
+      /* Canvas overlay encima del libro */
+      #annoCanvasWrap {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        pointer-events: none; z-index: 5;
+      }
+      #annoCanvasWrap.active { pointer-events: auto; }
+      #annoCanvasWrap canvas { display: block; }
+
+      /* Modales reutilizables */
+      .emi-modal {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+        display: none; align-items: center; justify-content: center; z-index: 99000;
+        padding: 20px;
+      }
+      .emi-modal.visible { display: flex; }
+      .emi-modal-box {
+        background: linear-gradient(135deg, var(--emi-dark), var(--emi-steel));
+        border: 2px solid var(--emi-gold); border-radius: 16px;
+        padding: 28px; max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto;
+        color: var(--emi-lightgold);
+      }
+      .emi-modal-box h3 {
+        color: var(--emi-gold); font-family: 'Playfair Display', serif;
+        font-size: 20px; margin-bottom: 16px;
+      }
+      .emi-modal-box label { display: block; font-size: 12px; opacity: 0.8; margin-bottom: 4px; margin-top: 12px; }
+      .emi-modal-box input, .emi-modal-box textarea, .emi-modal-box select {
+        width: 100%; background: var(--emi-navy); border: 1px solid rgba(255,215,0,0.3);
+        color: var(--emi-lightgold); border-radius: 8px; padding: 10px;
+        font-size: 14px; outline: none; font-family: inherit;
+      }
+      .emi-modal-box textarea { min-height: 120px; resize: vertical; }
+      .emi-modal-box input:focus, .emi-modal-box textarea:focus, .emi-modal-box select:focus {
+        border-color: var(--emi-gold); box-shadow: 0 0 0 3px rgba(255,215,0,0.15);
+      }
+      .emi-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
+      .emi-modal .btn-primary {
+        background: var(--emi-gold); color: var(--emi-dark); border: none;
+        padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 13px;
+      }
+      .emi-modal .btn-ghost {
+        background: transparent; color: var(--emi-lightgold);
+        border: 1px solid rgba(255,215,0,0.3); padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 13px;
+      }
+      .emi-help {
+        background: rgba(0,61,165,0.2); border-left: 3px solid var(--emi-gold);
+        padding: 10px 12px; border-radius: 6px; font-size: 12px; line-height: 1.5; margin-top: 8px;
+      }
+      .emi-help code { background: rgba(0,0,0,0.4); padding: 1px 6px; border-radius: 3px; color: var(--emi-gold); }
+
+      /* Panel de audio */
+      .audio-panel {
+        position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+        background: var(--emi-dark); border: 1px solid var(--emi-gold);
+        border-radius: 14px; padding: 12px 18px; display: none; align-items: center; gap: 12px;
+        z-index: 65; box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+      }
+      .audio-panel.visible { display: flex; }
+      .audio-panel .rec-dot {
+        width: 10px; height: 10px; border-radius: 50%; background: #ef4444;
+        animation: recPulse 1s infinite;
+      }
+      @keyframes recPulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+      .audio-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; margin-top: 8px; }
+      .audio-row {
+        display: flex; align-items: center; gap: 8px; background: var(--emi-navy);
+        border: 1px solid rgba(255,215,0,0.2); border-radius: 6px; padding: 6px 8px; font-size: 12px;
+      }
+      .audio-row audio { flex: 1; height: 28px; }
+      .audio-row button { background: transparent; color: var(--emi-gold); border: none; cursor: pointer; }
+
+      /* Paleta desplegable */
+      .anno-palette-toggle { position: relative; }
+      .anno-palette-toggle .palette-dot {
+        position:absolute; bottom:-2px; right:-2px; width:10px; height:10px;
+        border-radius:50%; border:1px solid #fff; box-shadow:0 0 3px rgba(0,0,0,.5);
+      }
+      .anno-colors-popup {
+        display:none; position: fixed; background: var(--emi-dark);
+        border:1px solid rgba(255,215,0,0.4); border-radius:10px; padding:10px;
+        box-shadow:0 8px 24px rgba(0,0,0,.5); z-index: 99999;
+        grid-template-columns: repeat(3, 1fr); gap:8px;
+      }
+      .anno-colors-popup.open { display:grid; }
+      .anno-colors-popup .anno-color { margin:0; }
+      /* Link box */
+      .anno-link-box { display:flex; flex-direction:column; gap:4px; width: 100%; align-items:center; }
+      .anno-link-box input {
+        width: 50px; padding: 3px 4px; font-size: 9px; border-radius: 4px;
+        background: var(--emi-dark); color: var(--emi-lightgold);
+        border: 1px solid rgba(255,215,0,0.3); outline:none;
+      }
+      .anno-link-box input:focus { border-color: var(--emi-gold); }
+      /* Cursor según herramienta */
+      #annoCanvasWrap.tool-text canvas    { cursor: text !important; }
+      #annoCanvasWrap.tool-note canvas    { cursor: copy !important; }
+      #annoCanvasWrap.tool-rect canvas    { cursor: crosshair !important; }
+      #annoCanvasWrap.tool-arrow canvas   { cursor: crosshair !important; }
+      #annoCanvasWrap.tool-pen canvas     { cursor: crosshair !important; }
+      #annoCanvasWrap.tool-highlight canvas { cursor: cell !important; }
+      #annoCanvasWrap.tool-link canvas    { cursor: pointer !important; }
+      /* Indicador flotante de herramienta */
+      .tool-cursor-indicator {
+        position: fixed; pointer-events: none; z-index: 9999;
+        width: 28px; height: 28px; border-radius: 50%;
+        display:flex; align-items:center; justify-content:center;
+        font-size: 13px; color: #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,.4); border: 2px solid #fff;
+        transform: translate(-50%, -50%); display:none;
+      }
+
+            .badge-anno {
+        position: absolute; top: 6px; right: 6px; background: var(--emi-gold); color: var(--emi-dark);
+        font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 700; z-index: 8;
+        pointer-events: none;
+      }
+    </style>
+</head>
+
+<body class="bg-animated">
+
+    <!-- ===== LOGIN GATE (Carnet) ===== -->
+    <style>
+      #carnetGate{position:fixed;inset:0;z-index:2147483646;background:var(--emi-navy);display:flex;align-items:center;justify-content:center;font-family:'Source Sans Pro',sans-serif;}
+      #carnetGate.hidden{display:none;}
+      #carnetGate .card{background:linear-gradient(160deg,#0A1628 0%,#001B44 100%);border:1px solid rgba(255,215,0,0.35);border-radius:14px;padding:36px 32px;width:min(92vw,420px);box-shadow:0 20px 60px rgba(0,0,0,.6);text-align:center;color:#FFF3C4;}
+      #carnetGate h1{font-family:'Playfair Display',serif;color:#FFD700;font-size:22px;margin-bottom:6px;}
+      #carnetGate p{font-size:13px;opacity:.8;margin-bottom:20px;}
+      #carnetGate input{width:100%;padding:12px 14px;border-radius:8px;border:1px solid rgba(255,215,0,.35);background:rgba(255,255,255,.06);color:#fff;font-size:16px;text-align:center;letter-spacing:2px;direction:ltr;}
+      #carnetGate input:focus{outline:none;border-color:#FFD700;box-shadow:0 0 0 3px rgba(255,215,0,.2);}
+      #carnetGate button{margin-top:14px;width:100%;padding:12px;border-radius:8px;border:none;background:#003DA5;color:#fff;font-weight:700;font-size:15px;cursor:pointer;transition:.2s;}
+      #carnetGate button:hover{background:#FFD700;color:#001B44;}
+      #carnetGate button:disabled{opacity:.6;cursor:wait;}
+      #carnetGateMsg{min-height:18px;margin-top:10px;font-size:13px;color:#ff8a8a;}
+      #carnetGate .ok{color:#9be29b;}
+    </style>
+    <div id="carnetGate">
+      <div class="card">
+        <h1>Acceso Restringido</h1>
+        <p>Ingrese su número de carnet para acceder al libro digital.</p>
+        <form id="carnetForm" autocomplete="off">
+          <input id="carnetInput" type="text" inputmode="numeric" placeholder="Número de carnet" required autofocus />
+          <button type="submit" id="carnetBtn">Ingresar</button>
+          <div id="carnetGateMsg"></div>
+        </form>
+      </div>
+    </div>
+    <script>
+    (function(){
+      const SHEET_ID = '1wGtMnBkYPwiGyWXwunCV8MP8uFrB2D5_KBiekLRTjuc';
+      const SHEET_NAME = 'Estudiantes';
+
+      const gate = document.getElementById('carnetGate');
+      const form = document.getElementById('carnetForm');
+      const input = document.getElementById('carnetInput');
+      const btn = document.getElementById('carnetBtn');
+      const msg = document.getElementById('carnetGateMsg');
+
+      // Bloquea el resto de la app hasta autenticar
+      document.documentElement.style.overflow = 'hidden';
+
+      function norm(s){ return String(s||'').replace(/[^0-9A-Za-z]/g,'').toUpperCase(); }
+
+      let carnetSet = null;
+      let loadError = null;
+      let loadResolve;
+      const loadPromise = new Promise(res => { loadResolve = res; });
+
+      // === Carga vía JSONP (evita CORS en archivos HTML locales) ===
+      // gviz/tq devuelve: google.visualization.Query.setResponse({...})
+      // Con responseHandler personalizamos el nombre del callback.
+      const CB = '__carnetCb_' + Math.random().toString(36).slice(2);
+      window[CB] = function(resp){
+        try {
+          const rows = (resp && resp.table && resp.table.rows) || [];
+          const set = new Set();
+          for (const r of rows) {
+            const cell = r && r.c && r.c[0];
+            if (!cell) continue;
+            const raw = (cell.v != null ? cell.v : cell.f);
+            const v = norm(raw);
+            if (v) set.add(v);
+          }
+          carnetSet = set;
+        } catch(e) {
+          loadError = e;
+          console.error('Parse error', e);
+        }
+        loadResolve();
+        try { delete window[CB]; } catch(_) { window[CB] = undefined; }
+      };
+
+      const url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
+                  '/gviz/tq?sheet=' + encodeURIComponent(SHEET_NAME) +
+                  '&tqx=responseHandler:' + CB +
+                  '&_=' + Date.now();
+      const s = document.createElement('script');
+      s.src = url;
+      s.async = true;
+      s.onerror = function(){
+        loadError = new Error('Network/JSONP load failed');
+        console.error('Sheet JSONP failed', url);
+        loadResolve();
+      };
+      document.head.appendChild(s);
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const val = norm(input.value);
+        if (!val) {
+          msg.style.color = '#ff8a8a';
+          msg.textContent = 'Ingrese su carnet.';
+          return;
+        }
+        btn.disabled = true;
+        msg.style.color = '#FFF3C4';
+        msg.textContent = 'Verificando...';
+        if (!carnetSet && !loadError) await loadPromise;
+        btn.disabled = false;
+        if (loadError || !carnetSet) {
+          msg.style.color = '#ff8a8a';
+          msg.textContent = 'No se pudo validar la lista. Verifique su conexión / permisos de la hoja.';
+          return;
+        }
+        if (carnetSet.has(val)) {
+          msg.style.color = '#9be29b';
+          msg.textContent = 'Acceso concedido.';
+          setTimeout(() => {
+            gate.classList.add('hidden');
+            document.documentElement.style.overflow = '';
+          }, 350);
+        } else {
+          msg.style.color = '#ff8a8a';
+          msg.textContent = 'Carnet no autorizado.';
+          input.select();
+        }
+      });
+    })();
+    </script>
+    <!-- ===== /LOGIN GATE ===== -->
+
+
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loader-ring mb-6"></div>
+        <h2 class="text-emi-gold font-bold text-xl" style="font-family: 'Playfair Display', serif;">Escuela de Idiomas del Ejercito</h2>
+        <p class="text-emi-lightgold text-sm mt-2 opacity-70">Cargando libro digital...</p>
+        <p class="text-emi-lightgold text-xs mt-4 opacity-40" id="loadingProgress">Preparando paginas...</p>
+    </div>
+
+    <div id="particles" aria-hidden="true"></div>
+    <div class="mode-indicator" id="modeIndicator"><i class="fas fa-hand-paper mr-2"></i> Modo Arrastre Activado</div>
+
+    <header class="top-bar px-4 py-2.5 flex items-center justify-between relative z-40">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full border-2 border-emi-gold flex items-center justify-center bg-emi-dark flex-shrink-0">
+                <i class="fas fa-shield-alt text-emi-gold text-xs"></i>
+            </div>
+            <div>
+                <h1 class="gold-shimmer text-base font-bold leading-tight" style="font-family: 'Playfair Display', serif;">Escuela de Idiomas del Ejercito</h1>
+                <p class="text-emi-lightgold text-xs opacity-50">Libro Digital Protegido</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button id="btnPan" class="btn-emi px-3 py-2 rounded-lg text-xs flex items-center gap-2" aria-label="Modo arrastre"><i class="fas fa-hand-paper"></i> <span class="hide-mobile">Arrastrar</span></button>
+            <button id="btnThumbs" class="btn-emi px-3 py-2 rounded-lg text-xs flex items-center gap-2" aria-label="Indice"><i class="fas fa-th"></i> <span class="hide-mobile">Indice</span></button>
+            <button id="btnTools" class="btn-emi px-3 py-2 rounded-lg text-xs flex items-center gap-2" aria-label="Herramientas" title="Herramientas didácticas (T)"><i class="fas fa-pencil-alt"></i> <span class="hide-mobile">Anotar</span></button>
+            <button id="btnAudio" class="btn-emi px-3 py-2 rounded-lg text-xs flex items-center gap-2" aria-label="Audio" title="Grabar / escuchar audio"><i class="fas fa-microphone"></i> <span class="hide-mobile">Audio</span></button>
+            <button id="btnSave" class="btn-emi px-3 py-2 rounded-lg text-xs flex items-center gap-2" aria-label="Guardar" title="Guardar página anotada (Ctrl+S)"><i class="fas fa-save"></i> <span class="hide-mobile">Guardar</span></button>
+            <button id="btnFullscreen" class="btn-emi px-3 py-2 rounded-lg text-xs" aria-label="Pantalla completa"><i class="fas fa-expand"></i></button>
+            <div class="flex items-center gap-2 ml-1 px-2 py-1.5 rounded-lg bg-emi-dark border border-emi-gold/20">
+                <i class="fas fa-lock text-emi-gold text-xs"></i>
+                <span class="text-emi-gold text-xs font-semibold hide-mobile">Seguro</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="relative" style="height: calc(100vh - 100px);" id="mainArea">
+        <div class="book-viewport" id="bookViewport">
+            <!-- Flechas fijas a los bordes del viewport -->
+            <button class="nav-arrow nav-prev disabled" id="btnPrev" aria-label="Pagina anterior"><i class="fas fa-chevron-left"></i></button>
+            <button class="nav-arrow nav-next" id="btnNext" aria-label="Pagina siguiente"><i class="fas fa-chevron-right"></i></button>
+
+            <div class="book-transform-wrapper" id="bookTransformWrapper">
+                <div class="relative" id="bookContainerWrapper" style="margin: auto;">
+                    <div class="book-wrapper">
+                        <div class="book book-glow relative" id="book" style="width: 720px; height: 500px; border-radius: 6px;">
+                            <div class="book-page" id="leftPage" style="width: 50%; left: 0; border-radius: 6px 0 0 6px;">
+                                <img id="leftPageImg" src="" alt="" draggable="false" />
+                                <div class="page-inner-shadow-l"></div>
+                                <div class="watermark-overlay" id="watermarkLeft"></div>
+                                <div class="security-layer"></div>
+                            </div>
+                            <div class="book-page" id="rightPage" style="width: 50%; left: 50%; border-radius: 0 6px 6px 0;">
+                                <img id="rightPageImg" src="" alt="" draggable="false" />
+                                <div class="page-inner-shadow-r"></div>
+                                <div class="watermark-overlay" id="watermarkRight"></div>
+                                <div class="security-layer"></div>
+                            </div>
+                            <div class="spine-shadow"></div>
+                            <div class="book-edge-right"></div>
+                            <div class="book-edge-bottom"></div>
+                            <div id="flipContainer"></div>
+                            <div id="annoCanvasWrap"><canvas id="annoCanvas"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <aside class="sidebar-panel closed fixed top-0 right-0 h-full w-72 z-50 pt-16 pb-20 overflow-hidden flex flex-col" id="sidebarPanel">
+            <button id="btnCloseSidebar" class="absolute top-3 right-3 text-emi-gold hover:text-white text-lg w-8 h-8 flex items-center justify-center rounded-lg hover:bg-emi-steel/50 z-10"><i class="fas fa-times"></i></button>
+            <h3 class="text-emi-gold text-xs font-bold uppercase tracking-widest px-4 mb-3 flex-shrink-0" style="font-family: 'Playfair Display', serif;">Indice de Paginas</h3>
+            <div class="px-4 mb-3 flex-shrink-0">
+                <div class="flex items-center gap-2">
+                    <input type="number" class="page-jump-input" id="pageJumpInput" min="1" max="220" placeholder="N." aria-label="Ir a pagina" />
+                    <button class="btn-emi px-3 py-1 rounded text-xs" id="btnJump">Ir</button>
+                </div>
+                <p class="text-emi-lightgold text-xs opacity-40 mt-1">Numero de pagina (1-220)</p>
+            </div>
+            <div class="flex-1 overflow-y-auto" id="thumbScrollArea"><div class="thumb-grid" id="thumbList"></div></div>
+        </aside>
+    </main>
+
+    <footer class="bottom-bar px-4 py-2 flex items-center justify-between relative z-40">
+        <div class="flex items-center gap-3"><span class="text-emi-lightgold text-xs opacity-50 hide-mobile"><i class="fas fa-info-circle mr-1"></i> Flechas o teclado para navegar</span></div>
+        <div class="flex items-center gap-3">
+            <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width: 0%"></div></div>
+            <div class="page-indicator" id="pageIndicator">Pagina 1 de 220</div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button id="btnZoomOut" class="btn-emi px-2 py-1 rounded text-xs"><i class="fas fa-search-minus"></i></button>
+            <span class="text-emi-gold text-xs font-semibold min-w-[40px] text-center" id="zoomLevel">100%</span>
+            <button id="btnZoomIn" class="btn-emi px-2 py-1 rounded text-xs"><i class="fas fa-search-plus"></i></button>
+            <button id="btnFitPage" class="btn-emi px-2 py-1 rounded text-xs ml-1" title="Ajustar"><i class="fas fa-compress-arrows-alt"></i></button>
+        </div>
+    </footer>
+
+    <div class="toast-msg" id="toast"></div>
+
+    
+    <!-- Toolbar flotante de anotación -->
+    <div class="anno-toolbar hidden" id="annoToolbar">
+      <button class="anno-btn active" data-tool="select" title="Seleccionar"><i class="fas fa-mouse-pointer"></i></button>
+      <button class="anno-btn" data-tool="pen" title="Lápiz"><i class="fas fa-pen"></i></button>
+      <button class="anno-btn" data-tool="highlight" title="Resaltador"><i class="fas fa-highlighter"></i></button>
+      <button class="anno-btn" data-tool="text" title="Texto"><i class="fas fa-font"></i></button>
+      <button class="anno-btn" data-tool="note" title="Nota adhesiva"><i class="fas fa-sticky-note"></i></button>
+      <button class="anno-btn" data-tool="link" title="Cuadro de enlace (se abre en el PDF)"><i class="fas fa-link"></i></button>
+      <button class="anno-btn" data-tool="rect" title="Rectángulo"><i class="far fa-square"></i></button>
+      <button class="anno-btn" data-tool="arrow" title="Flecha"><i class="fas fa-long-arrow-alt-right"></i></button>
+      <button class="anno-btn" data-tool="eraser" title="Borrar selección"><i class="fas fa-eraser"></i></button>
+      <div class="anno-divider"></div>
+      <div class="anno-palette-toggle">
+        <button class="anno-btn" id="btnPalette" title="Colores"><i class="fas fa-palette"></i></button>
+        <span class="palette-dot" id="paletteDot" style="background:#000000"></span>
+        <div class="anno-colors-popup" id="colorsPopup">
+          <div class="anno-color active" data-color="#000000" style="background:#000000" title="Negro (dibujar)"></div>
+          <div class="anno-color" data-color="#FFD700" style="background:#FFD700" title="Amarillo (resaltar)"></div>
+          <div class="anno-color" data-color="#1d4ed8" style="background:#1d4ed8" title="Azul (enlace)"></div>
+          <div class="anno-color" data-color="#ef4444" style="background:#ef4444" title="Rojo"></div>
+          <div class="anno-color" data-color="#22c55e" style="background:#22c55e" title="Verde"></div>
+          <div class="anno-color" data-color="#f59e0b" style="background:#f59e0b" title="Naranja"></div>
+          <div class="anno-color" data-color="#a855f7" style="background:#a855f7" title="Morado"></div>
+          <div class="anno-color" data-color="#ec4899" style="background:#ec4899" title="Rosa"></div>
+          <div class="anno-color" data-color="#ffffff" style="background:#ffffff" title="Blanco"></div>
+        </div>
+      </div>
+      <div class="anno-divider"></div>
+      <select id="annoFontFamily" class="anno-select" title="Tipo de letra">
+        <option value="Source Sans Pro">Sans</option>
+        <option value="Playfair Display">Playfair</option>
+        <option value="Arial">Arial</option>
+        <option value="Helvetica">Helvet</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Times New Roman">Times</option>
+        <option value="Courier New">Courier</option>
+        <option value="Verdana">Verdana</option>
+        <option value="Tahoma">Tahoma</option>
+        <option value="Comic Sans MS">Comic</option>
+        <option value="Trebuchet MS">Trebuc</option>
+      </select>
+      <select id="annoFontSize" class="anno-select" title="Tamaño de texto">
+        <option>6</option><option>7</option><option selected>8</option><option>9</option>
+        <option>10</option><option>11</option><option>12</option><option>14</option>
+        <option>16</option><option>18</option><option>22</option><option>26</option>
+        <option>32</option><option>40</option><option>50</option><option>64</option>
+      </select>
+      <button class="anno-btn" id="annoBold" title="Negrita"><i class="fas fa-bold"></i></button>
+      <button class="anno-btn" id="annoItalic" title="Cursiva"><i class="fas fa-italic"></i></button>
+      <div class="anno-divider"></div>
+      <div class="anno-link-box">
+        <input id="annoLinkUrl" type="text" placeholder="URL" title="URL o término a buscar"/>
+        <button class="anno-btn" id="annoLinkSearch" title="Buscar en la web"><i class="fas fa-search"></i></button>
+        <button class="anno-btn" id="annoLinkInsert" title="Insertar enlace en la página"><i class="fas fa-link"></i></button>
+      </div>
+      <div class="anno-divider"></div>
+      <button class="anno-btn" id="annoUndo" title="Deshacer"><i class="fas fa-undo"></i></button>
+      <button class="anno-btn" id="annoClear" title="Limpiar página"><i class="fas fa-trash"></i></button>
+    </div>
+
+    <!-- Panel audio -->
+    <div class="audio-panel" id="audioPanel">
+      <button class="anno-btn" id="btnRecAudio" title="Grabar"><i class="fas fa-microphone"></i></button>
+      <span id="recStatus" style="color: var(--emi-lightgold); font-size: 12px;">Listo</span>
+      <button class="anno-btn" id="btnShowAudios" title="Mis audios"><i class="fas fa-list"></i></button>
+      <button class="anno-btn" id="btnCloseAudio" title="Cerrar"><i class="fas fa-times"></i></button>
+    </div>
+
+
+    <!-- Modal: Guardar -->
+    <div class="emi-modal" id="saveModal">
+      <div class="emi-modal-box">
+        <h3><i class="fas fa-save mr-2"></i>Guardar mi trabajo</h3>
+        <label>Nombre del archivo</label>
+        <input id="saveName" placeholder="mi_trabajo_pagina_5" />
+        <label>Formato</label>
+        <select id="saveFormat">
+          <option value="png">Imagen PNG (página actual)</option>
+          <option value="pdf">PDF (página actual)</option>
+          <option value="pdf-all">PDF (todas las páginas con anotaciones)</option>
+        </select>
+        <label>Calidad</label>
+        <select id="saveQuality">
+          <option value="2">Alta (2x)</option>
+          <option value="3">Muy alta (3x)</option>
+          <option value="1">Normal (1x)</option>
+        </select>
+        <div class="emi-modal-actions">
+          <button class="btn-ghost" data-close>Cancelar</button>
+          <button class="btn-primary" id="btnDoSave"><i class="fas fa-download mr-1"></i>Descargar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Lista de audios -->
+    <div class="emi-modal" id="audioListModal">
+      <div class="emi-modal-box">
+        <h3><i class="fas fa-microphone mr-2"></i>Audios grabados</h3>
+        <div id="audioListContainer" class="audio-list"></div>
+        <div class="emi-modal-actions">
+          <button class="btn-ghost" data-close>Cerrar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="security-modal" id="securityModal">
+        <div class="security-modal-box">
+            <div class="w-16 h-16 rounded-full border-2 border-emi-gold flex items-center justify-center bg-emi-dark mx-auto mb-6"><i class="fas fa-shield-alt text-emi-gold text-2xl"></i></div>
+            <h2 class="text-emi-gold text-xl font-bold mb-3" style="font-family: 'Playfair Display', serif;">Documento Protegido</h2>
+            <p class="text-emi-lightgold text-sm mb-2 opacity-80 leading-relaxed">Este libro digital es propiedad de la <strong class="text-emi-gold">Escuela de Idiomas del Ejercito</strong>. Su reproduccion, distribucion o copia parcial o total esta estrictamente prohibida.</p>
+            <p class="text-emi-lightgold text-xs mb-6 opacity-50">Se han implementado medidas de seguridad que detectan e impiden la captura, descarga y reproduccion no autorizada del contenido.</p>
+            <div class="flex flex-col gap-2 text-left mb-6 px-4">
+                <div class="flex items-center gap-2 text-xs text-emi-lightgold opacity-70"><i class="fas fa-ban text-red-400 w-4"></i> Capturas de pantalla bloqueadas</div>
+                <div class="flex items-center gap-2 text-xs text-emi-lightgold opacity-70"><i class="fas fa-ban text-red-400 w-4"></i> Descarga de imagenes deshabilitada</div>
+                <div class="flex items-center gap-2 text-xs text-emi-lightgold opacity-70"><i class="fas fa-ban text-red-400 w-4"></i> Impresion restringida</div>
+                <div class="flex items-center gap-2 text-xs text-emi-lightgold opacity-70"><i class="fas fa-ban text-red-400 w-4"></i> Herramientas de desarrollador bloqueadas</div>
+                <div class="flex items-center gap-2 text-xs text-emi-lightgold opacity-70"><i class="fas fa-check text-green-400 w-4"></i> Marca de agua de seguridad aplicada</div>
+            </div>
+            <button id="btnAcceptSecurity" class="btn-emi px-8 py-3 rounded-lg font-bold text-sm tracking-wider"><i class="fas fa-check mr-2"></i> ACEPTAR Y CONTINUAR</button>
+        </div>
+    </div>
+
+    <script>
+        // =====================================================================
+        // CONFIGURACIÓN DEL LIBRO  -  CARGA DESDE GOOGLE DRIVE (SIN API KEY)
+        // ---------------------------------------------------------------------
+        // MÉTODO SIMPLIFICADO con Google Apps Script (no requiere API Key
+        // ni Google Cloud Console). Pasos UNA SOLA VEZ:
+        //
+        //   1. Abre https://script.google.com  →  "Nuevo proyecto"
+        //   2. Borra el código y pega esto (cambia el ID de la carpeta):
+        //
+        //        function doGet(e) {
+        //          const folder = DriveApp.getFolderById('1WCum0725CyLI8mbOQUBIizSLSRjC6Sb');
+        //          const files = folder.getFiles();
+        //          const map = {};
+        //          while (files.hasNext()) {
+        //            const f = files.next();
+        //            map[f.getName()] = f.getId();
+        //          }
+        //          const json = JSON.stringify(map);
+        //          const cb = e && e.parameter && e.parameter.callback;
+        //          return ContentService
+        //            .createTextOutput(cb ? cb + '(' + json + ')' : json)
+        //            .setMimeType(cb ? ContentService.MimeType.JAVASCRIPT : ContentService.MimeType.JSON);
+        //        }
+        //
+        //   3. "Implementar"  →  "Nueva implementación"
+        //      Tipo: "Aplicación web"
+        //      Ejecutar como: TÚ
+        //      Quién tiene acceso: "Cualquier usuario"   ← IMPORTANTE
+        //   4. Copia la URL que termina en /exec y pégala abajo en
+        //      DRIVE_INDEX_URL. Listo, jamás vuelves a tocarlo.
+        //
+        // La carpeta de Drive debe estar como "Cualquiera con el enlace ver".
+        // PAGE_NAMES se adapta solo a más o menos páginas.
+        // =====================================================================
+        const DRIVE_INDEX_URL = 'https://script.google.com/macros/s/AKfycbx6sxdIAAh6ajZ0vMKbBzPJDOTD3n9Ia__wkdDCTw7YoF0vq8XFFhv5lYZJk9WQDFZh/exec'; // ← pega aquí la URL /exec de tu Apps Script
+        const IMAGE_EXTENSION = '.jpg';
+        const BASE_PATH = './'; // respaldo local si no se configura Apps Script
+
+        // Nombres de las 220 páginas (editable: añade/quita y el libro se adapta)
+        const PAGE_NAMES = [];
+        for (let i = 1; i <= 288; i++) {
+            PAGE_NAMES.push('book 18_' + String(i).padStart(3, '0'));
+        }
+
+        // Etiquetas mostradas en el índice
+        function defaultLabel(i, total) {
+            if (i === 0) return 'Portada';
+            if (i === total - 1) return 'Contraportada';
+            return 'Página ' + i;
+        }
+
+        // Construye PAGES a partir de PAGE_NAMES
+        const PAGES = PAGE_NAMES.map((name, i) => ({
+            img: name,
+            label: defaultLabel(i, PAGE_NAMES.length)
+        }));
+
+        // Mapa nombre → ID de Drive, rellenado en init() desde Apps Script
+        const DRIVE_ID_MAP = {};
+
+        // Mapa de IDs de Drive incrustado (respaldo): garantiza que las
+        // imágenes aparezcan aunque el navegador bloquee la llamada JSONP.
+        const DRIVE_ID_MAP_EMBEDDED = {
+            "book 18_001.jpg": "1SGu32O-EKagTlBPzdXjFRWpjvVUSmq4T",
+            "book 18_002.jpg": "16FFYyiNiz5aO2jhY34a7W36IGZurbwjT",
+            "book 18_003.jpg": "1Kg1Ple6XhCwXmuz0SQDqdvg9QPQaQfIU",
+            "book 18_004.jpg": "16P22T8YkM69XOc4EAN7ZnI3PyjPNjsjq",
+            "book 18_005.jpg": "1HwNFOa0S198zo5159yuFQ9zNcUiaeZFr",
+            "book 18_006.jpg": "1HrN-BLtbynCBJhbLmL4BNMCvMOQ-6XxR",
+            "book 18_007.jpg": "1TrTDp1m2x0LngNJopjQYsE2J-X9uGEzJ",
+            "book 18_008.jpg": "1drPLJdN3e5yDUk_53Ldy8Hb16t6k5YR-",
+            "book 18_009.jpg": "1G67lxEZDZX9VzpptGqhLkdtd1My-W36D",
+            "book 18_010.jpg": "1WHdu5ZS1y0EUWODfx9oX6Z4BpxCTAbfx",
+            "book 18_011.jpg": "1chemAgivQaBqpIzUx9p-NGhCDUpA-p2Q",
+            "book 18_012.jpg": "1BZK9RIwBxRnK-Dr4-HSTCONAOveXLwZK",
+            "book 18_013.jpg": "1lS7DVoEloAg6akQrJ0PbMyvviI0f2kEA",
+            "book 18_014.jpg": "1PNankGKHmkswaxt6oLcvErgUC7mLbtTy",
+            "book 18_015.jpg": "1SN8yjDOkZ6Ww5R9E4eiFFhkYvpE5H-Yt",
+            "book 18_016.jpg": "1XktuYlvfP6oQgQ8gUZsaGl4-0GBFuk1z",
+            "book 18_017.jpg": "12DOs0xK_-X7AvQ-PkzpT-75-T291EvCT",
+            "book 18_018.jpg": "1jMKkolHSM9qvKCa9ID1iDALng0Cw5TUL",
+            "book 18_019.jpg": "1mT04ksGrPm9KKg-hUiBVVrignQY-RsX0",
+            "book 18_020.jpg": "1gysCPevFQkW7vrKXfsmKwDtNh4FXZXDk",
+            "book 18_021.jpg": "1zrfs3LX3SqXTTNiUJACdf-ekEVuxARey",
+            "book 18_022.jpg": "1InBSgAnCYBh2owesvMcGoxnnToUKiuDo",
+            "book 18_023.jpg": "1A6bsZX1m9HKOgpj1ka2D25Rb0z-Q0_4U",
+            "book 18_024.jpg": "1mBBzxEryUTNOPMKHG2JG9xhXk9jV5K2t",
+            "book 18_025.jpg": "1tEZ0GsNhWPmYGPHCnTIjR-9ZJScfqC0B",
+            "book 18_026.jpg": "1SSKBpOZyhOj0OAL4w7Pv-ZtXZcKSB7Hu",
+            "book 18_027.jpg": "1bpMwcJqYylzb93dWkf974GRgerGVnbAC",
+            "book 18_028.jpg": "1qyuEjVbdELV3GQp4mZbx5ZTupLyoipJ9",
+            "book 18_029.jpg": "1p6YRAPO3KpZgkK_Dds8ezqH2xy4umROY",
+            "book 18_030.jpg": "1XyVSKgqkBd4jRLbfeQYHisRoZR51pywC",
+            "book 18_031.jpg": "1Z0eA5VXeVSngegWQKfDJKUg_IEIw609y",
+            "book 18_032.jpg": "1B_QTFxlgsOhcKa7UaBwIAEY0uvXs3M4C",
+            "book 18_033.jpg": "1_TgFAtZVIEBDPwJ4HYEkakwPZnJ73e1v",
+            "book 18_034.jpg": "1lw3US_iUDjPzJJPSdmM-5aobD1oYnYe1",
+            "book 18_035.jpg": "17qplmQpIPajsehYgTtH-3ti45uT8Tr9o",
+            "book 18_036.jpg": "10xKystCNH-gw4FYLxGadVzExUwE4lnod",
+            "book 18_037.jpg": "1mr00JuogynmWOZ1obkNR2LzqbhN2RJto",
+            "book 18_038.jpg": "1uhk0HN7o6ymkjXFQF8WUaQh83fGNudAN",
+            "book 18_039.jpg": "1XTN8wgp_Sa7Tx1NAGfUIdmf-pqezu-Xg",
+            "book 18_040.jpg": "15fQbAeYX7yBSJ2emcXt1PYK_fmPSymwX",
+            "book 18_041.jpg": "1KPyy-w5V7VL0hg7nCdXtL9ry-ZYG7FbB",
+            "book 18_042.jpg": "16VmkHxccT9MYH3dvkBKfuk3HSFg0_LFX",
+            "book 18_043.jpg": "1uDNkhfCYrCpnecHNLjz3tcqQC2XEfWUK",
+            "book 18_044.jpg": "1AFtKJ9ilLKRxFCHNy--rBSAMxtVWvA-I",
+            "book 18_045.jpg": "1fSkXIJk3dZt5Ob5n8_I3QsRav8NuSUBH",
+            "book 18_046.jpg": "1mmdz4-LxE2twdAD1edTr69XzITvpLjVu",
+            "book 18_047.jpg": "17ub-d3cpCYPjobEwgRviB99VWVtWEUkG",
+            "book 18_048.jpg": "10lPsngkTRJSYNJnkEK84AGMyjRwaUa4-",
+            "book 18_049.jpg": "18Oru-m1amZvtVxO_yVq_Rn0O3yn5GUdL",
+            "book 18_050.jpg": "19oTgF2hVqQ0iL3Y38ygU1-E_1sGBlrWo",
+            "book 18_051.jpg": "1ECyrerchZzroA5Vzl_ZPGLVt3-yX6rSj",
+            "book 18_052.jpg": "11OLsZTWIkj2eni7LQ2j447exhTcJh1D_",
+            "book 18_053.jpg": "1BFVRmxNup_evgYUy2tFGwqvmk2iCREKA",
+            "book 18_054.jpg": "1rlI_yFZkV2wFOFKb9-J-5lX5V07KvV2S",
+            "book 18_055.jpg": "1IRDTXTbZ59ZXiAOGM3D21K9z2OT7Mf3p",
+            "book 18_056.jpg": "1dWwOMJyQn3wvVV2iPEaVRHcguxJKqZ61",
+            "book 18_057.jpg": "1w7TFxlFdrCFp-MihzkNOGL9-bldEPSUe",
+            "book 18_058.jpg": "1h7zbqNZpMa-sD6947ZoKCIarWI5HG0aM",
+            "book 18_059.jpg": "1Dyy8PdnCyCvYh_HZaUvLSMiqP7gJfSnj",
+            "book 18_060.jpg": "1aEbG9-C3tzsrLSlPy_dV5XQlaetvTh1Y",
+            "book 18_061.jpg": "1f_AeoblhVl0xT6snHLkwDKkgeLdafkUc",
+            "book 18_062.jpg": "1v-Z_W0Gu9AuX8e-dthvRLik_XyZbbgcJ",
+            "book 18_063.jpg": "1WciGtN050dRVJK9qtyWS5Ftt9DCJJsow",
+            "book 18_064.jpg": "1evh1DfIdi6mexLgr3QmMiD8noKzC8SNY",
+            "book 18_065.jpg": "1rk7NHBRUqmt46VpNRrhQyRkM1QoCfY_Z",
+            "book 18_066.jpg": "1nCPT89fLsIo0KD6nQSR6f6xU3HLfqZal",
+            "book 18_067.jpg": "1sBW3XwXu4XQktIQQ_WDL7fsd8eSEe3Vo",
+            "book 18_068.jpg": "11sEToz5Bu3D01VwXtmCxAV_M098KzkbK",
+            "book 18_069.jpg": "1tRZTD1lnZno7BOYWW4zVqsxezJ5BvYpm",
+            "book 18_070.jpg": "1of-8rFjNUO0YgR4E5R83_uovbNFo__8f",
+            "book 18_071.jpg": "1GVVVnf0I2-CtmcpEvLSpSwybwK_xUekA",
+            "book 18_072.jpg": "1pk_gjGObl9nRuSBVUipUuhN2qxiyEQJR",
+            "book 18_073.jpg": "1jyK9zfUTF4bNH1XrreAL-7SF5iKSx7tm",
+            "book 18_074.jpg": "1lm-AOekZzxLmuMwMP0xr5cyN6EUt3Q4S",
+            "book 18_075.jpg": "199jyosFVcWUSMV1y6HM1gt7sdELo74hg",
+            "book 18_076.jpg": "17eqw35p97mUJ8oNgU11-Yufr9vlH1fpf",
+            "book 18_077.jpg": "1B4qHEPMLikGJHKxL0e9FcEDY0hB9n1Cv",
+            "book 18_078.jpg": "1-928hBvAMJ96IC0Bx953DPgN1DUznNSr",
+            "book 18_079.jpg": "1zWMMYZNZVXC1-o-uvjMjk9b3snvz7sOM",
+            "book 18_080.jpg": "1HuwzxDBqlxJzfN9KdSavGCNCw8beeEca",
+            "book 18_081.jpg": "1e7V_S49StdLe5iMwo1FE_Z9O9bSdyTmW",
+            "book 18_082.jpg": "1p3AMaoRf4njHKtiZtTn6Z7UyzkwvOZqT",
+            "book 18_083.jpg": "1mxa5QqkQKHA5fM8Ia8-O5gU0MxdVSzZA",
+            "book 18_084.jpg": "1un3EvwQTbUBAklIfTTiWypq4ct9toCXw",
+            "book 18_085.jpg": "1sP_FQ6bs-Jfu2YX85oo2HxLopx3tCSg8",
+            "book 18_086.jpg": "1GxmuEvXNi0dfd9Zxav5PGREmJx8oay2W",
+            "book 18_087.jpg": "1QzGsOTCGOuCNkwkM0iN1_Odr_OqGTLg-",
+            "book 18_088.jpg": "1SYL769awUp_4fy2uUO-k7WYo5PlNBa0n",
+            "book 18_089.jpg": "1f4lmUO_cgnUcXQDVXi-CVHGdcGyJ0iOF",
+            "book 18_090.jpg": "1ZDQHyrrAzAu0tu9jk32qMvLL1o2Xa7j-",
+            "book 18_091.jpg": "1DKeY1UMHpnMpVn-Y7u7Kit08Yh59SL0w",
+            "book 18_092.jpg": "1SzcRPF-eo6U8t2dwqgKKMvCYW-JMNbNF",
+            "book 18_093.jpg": "1T0b5_dziQcunS3ALzxExQSrWUrihP5_j",
+            "book 18_094.jpg": "1J-chPb-cWbvfVY8OkmfoFLE_AGVuAFfa",
+            "book 18_095.jpg": "1U9RPzSgZp9xUhTIQV1ME6SQrMCIsJgdO",
+            "book 18_096.jpg": "18kU11WML6S03yUC9oRIBi2KsG6XsKotI",
+            "book 18_097.jpg": "1w8oWW_uZPe0az4idN6mjRwMLeSSwoh--",
+            "book 18_098.jpg": "1gtB3x9wZnfedBUZCgd50xvMO34skU9Cm",
+            "book 18_099.jpg": "1bxEFG1gSTK_Xgn06aD3a0is33QLKhKte",
+            "book 18_100.jpg": "1olSIIihmVOs-IlaQLyzyRTWdO6IY4BPY",
+            "book 18_101.jpg": "1etmm01aZ1lDCsbq3fiKxrlMCWnbDv6ID",
+            "book 18_102.jpg": "1LeJ6-u_vyPATo6C1zqglrqFkydMsJZai",
+            "book 18_103.jpg": "1CNoNwYYXunx1Kb6E6NBWEFoTshwe0z-i",
+            "book 18_104.jpg": "1t2yu7JlcBt4doQYgWkiXFcl9gwZCP_xV",
+            "book 18_105.jpg": "1Qh8dxfUD-z7fAYStXt2_XrkWOTxYicgM",
+            "book 18_106.jpg": "10ADfGMmPiewS6Bg19au1ONTbszdKOw6y",
+            "book 18_107.jpg": "1TfpMpVB-ZopI5cjALsV2MPGqagkweMET",
+            "book 18_108.jpg": "1wvWuarXAAa9Pf-7joOHWUibN5yoJm208",
+            "book 18_109.jpg": "1d1nCLefuIpsLWHR-fLZACrvzaN0l8ADL",
+            "book 18_110.jpg": "1AQxapXjzZHPTgFk8d8CFRp_ZC28XpeZw",
+            "book 18_111.jpg": "14bEavQxdP3yuOYo1dFWzfBwDNvWQyavU",
+            "book 18_112.jpg": "15oi--1XbMOV15dThFfuXeEqvplEecUOl",
+            "book 18_113.jpg": "1AGCQDuq0keKaN2hCnMs0RWG25M0TS9t_",
+            "book 18_114.jpg": "1u0Ju3NvlrxNpb9ArkxT1ARQxGnYm4QL6",
+            "book 18_115.jpg": "1vvjKGfMfiBUGD-7i9YCAR5VzIPXGs1O3",
+            "book 18_116.jpg": "1IN-xMGHa2qlW6kg5Gz5Pvi7l2D_SXHSk",
+            "book 18_117.jpg": "1TfIDkTJ5D6LqeC2CVIiQuwipafBJzcKN",
+            "book 18_118.jpg": "1ogBGKrmEV13LEugfFtJY42chfxPaxDLR",
+            "book 18_119.jpg": "1w5bTN-iEvNF851BN0yoOkWazFlHIJcJJ",
+            "book 18_120.jpg": "1u4jbVDdgvsYjzzr1nvryZ_SP1KQypAlR",
+            "book 18_121.jpg": "1UzgqTsEKOZU_Jws-dCuVH96wGyuM8igQ",
+            "book 18_122.jpg": "1hHVvIMdMX2jWRaxgmukYTCYbWOFwJwTB",
+            "book 18_123.jpg": "1NBnVYhpg8G7W8uzxNfyHpeFafbRszyOg",
+            "book 18_124.jpg": "1WGJaLz2Urbxt2cneAxvtEGbYKrivald1",
+            "book 18_125.jpg": "186YG2qZKcKEdjXFzMiDZdmln2arJS1Jr",
+            "book 18_126.jpg": "1WLEu0Doii3DktSRx2phF8__JzvPXcA3n",
+            "book 18_127.jpg": "1T2bkIJlAkvBXTe_0dJiJQtHd9yrkP0YQ",
+            "book 18_128.jpg": "1EskuWqRP6vai8Lp4IchgDAkbFE5Z35W5",
+            "book 18_129.jpg": "1y4whyZFacTIKrvYO1a1PnzaLPgoF449U",
+            "book 18_130.jpg": "1vU43OCzZIl9rsB7TyZtjKmVsBiWa_dG-",
+            "book 18_131.jpg": "1_-YvdnmKzfp6tgcVqV1A2YI2LxX2Y7tR",
+            "book 18_132.jpg": "1XhwZesDNY56asPhnzOiVF67oCJgnmHoc",
+            "book 18_133.jpg": "139sv-iTsfYPjinklvYRrTogFiWrgZ1H2",
+            "book 18_134.jpg": "1oBd_ZPxkkSDjXRcWucnOK6Td_UuZ8byv",
+            "book 18_135.jpg": "1Pi8RHIlGBxaNtz_yUjaUo-KSct8x89kD",
+            "book 18_136.jpg": "1fldyUhU-uK9xtaqds-Wg2oGRvk24xem9",
+            "book 18_137.jpg": "1SpwfgV9b085hyt8F5DR3whWrvAPh_BZG",
+            "book 18_138.jpg": "1tx-xgNLf50cPpShnB0TejyK5nE-RfRUK",
+            "book 18_139.jpg": "13x7rxKzlJMxQmhEqr52NX4WHvMBqUnaO",
+            "book 18_140.jpg": "1OvGw3VNWJnn5WvjR0mpzj9q2UUNR0hIs",
+            "book 18_141.jpg": "13cEccTpT3zzSCtzLj9srEK8K73cQ212w",
+            "book 18_142.jpg": "1Fh7zwZ63PmU661Cv2BwCJdGCpbWt0hfg",
+            "book 18_143.jpg": "1GY0q4uUu0WQbTTFtS0LdTfilBj6717Ln",
+            "book 18_144.jpg": "1aHOWkrztdhNurwkIbqSjPVbnICnuomfS",
+            "book 18_145.jpg": "1wP7s_svrZH3JbSztA30gHZFdAOr6EQTe",
+            "book 18_146.jpg": "16hQrf-XhOMSc8sR_n90CwFD21wZi8kSY",
+            "book 18_147.jpg": "1C_KqoRSIWfOGBeAhMbQeUl0oNMW_86I7",
+            "book 18_148.jpg": "1KHUS12BM4Ljf3_t1BHfV6Y8S6hbvsCKE",
+            "book 18_149.jpg": "1KANUuHEL9IFg6U_x_-QzOV_rBShOhYDI",
+            "book 18_150.jpg": "1jfxVES6zye4I_nWugorB2IU_s40Hvzop",
+            "book 18_151.jpg": "1Ji8cJVTRp4k2oLZn6tRXo80m6IGa1XHQ",
+            "book 18_152.jpg": "1VogRXvTN2TZ7yskRRVyVvs_dCb4sfZ0d",
+            "book 18_153.jpg": "1sa9TTfv1OxQHZZ4wIWfP1EXtFylAEAgX",
+            "book 18_154.jpg": "1b5uBwPjl9ex-vgY963P0XnqsQ0aGQWN4",
+            "book 18_155.jpg": "1ELYe1DG88vZPTAJaoNzRtlQqI6SxB_C2",
+            "book 18_156.jpg": "1L_oBWu59VSGZPAXSKpE8RoeAhZE1jyDH",
+            "book 18_157.jpg": "16k5NH4GHK8s0rceF8TohDd2HHqmhQnO_",
+            "book 18_158.jpg": "11kCm2hocjDGstl-2bWvrD-U0K1romEJg",
+            "book 18_159.jpg": "1-p_ITsjYUDRavuq8kEJEE01Dip50UeGk",
+            "book 18_160.jpg": "1EPKbo_JzpyM2uJtPCdEH83hnYpEZpjjM",
+            "book 18_161.jpg": "1uq9Zf0glczNGYGwBuu8x9TEzNWxyItCd",
+            "book 18_162.jpg": "1yi9nAvOj8l4Me7YF9bmgY_ZdcIoaBpn2",
+            "book 18_163.jpg": "1muNOvGmjin2NF5ckBRgVbnb2a_DxDzLc",
+            "book 18_164.jpg": "1QM7QQ6PwBAibDL1qCJdMJtpk3oEgiJ92",
+            "book 18_165.jpg": "1tYXHiBshjcIUx00_oTQJ1glY3VwEcpVb",
+            "book 18_166.jpg": "1_N-MmtA2_ApBiDDTIxEi0ijUDB3wtI48",
+            "book 18_167.jpg": "17LI6aaHWs8H8_vQ-3WvWQAaMi-gjNSqT",
+            "book 18_168.jpg": "1_VMcsycTn7DVrK5syM7FUQnUt42iO52h",
+            "book 18_169.jpg": "1E73sAvLqSRvABv3Q26aD-xBtczK0Zmtx",
+            "book 18_170.jpg": "1vYgMhBBeuzRBKAM6Q1zpEoh0a4uT-dZ8",
+            "book 18_171.jpg": "1_m_twhiNG2_34T-3x3RitAUxgNcB1Cnc",
+            "book 18_172.jpg": "1zZ5GFpj1n5PUBs-XUG2nWKCV4HdBVNld",
+            "book 18_173.jpg": "1e1Akz6JyTW8tXweRIluVlmcvGZ2kGgps",
+            "book 18_174.jpg": "1_JYQfPrOYky8q0yRXTO4Ok3KAy-9USI_",
+            "book 18_175.jpg": "1750nW6nltq1QmVSdrdNlM1Xe3gJUK5yy",
+            "book 18_176.jpg": "14vvI7pXC2M8jtBqDQqU58XPOJ5K4RICf",
+            "book 18_177.jpg": "15QJQHFKdscvTbkkkIIcTjpNIzxt6UsNp",
+            "book 18_178.jpg": "1radTgEiV0_7x1LM-LtTtfESU8cDNLpmo",
+            "book 18_179.jpg": "1e4W276feaIFV6A5KgVpI2EpZfkJdF-5F",
+            "book 18_180.jpg": "1zKnEe0wfCQOjPUGVitkTxdca0i6EXFDd",
+            "book 18_181.jpg": "107np1vXss78ogvD8oJs8U4hJWHE9SAmM",
+            "book 18_182.jpg": "1cBwooyJ8LJ3Ef_yPg5qv1XlTd8W6G3US",
+            "book 18_183.jpg": "1-ExyO0mSbvKQQzSOy6gJsuZyxmMQDEKo",
+            "book 18_184.jpg": "1sH6E_XT6wnEpyvcO1VW84Z5IVBhn24kz",
+            "book 18_185.jpg": "11ZuEfuMqWDdGobxYG3qAmWqNEFJtupbU",
+            "book 18_186.jpg": "1V-QgPkzFP6QI5L4dcjg6pPdTc_neFSKR",
+            "book 18_187.jpg": "1Pzm7cix3UzqUApa6C0jOkVoCIASM9M3l",
+            "book 18_188.jpg": "1JQpzYG_wIgjLoCaqJhgaRj1gLgILTmKW",
+            "book 18_189.jpg": "152yuNyH9zI-Gm2PV5cIFAFAKguZTerbP",
+            "book 18_190.jpg": "1zKDUkUDZuQ9UYb2exNUvE3-qstd1GNRd",
+            "book 18_191.jpg": "10uV06bKS325j88r7o-wI5GUDk-m5GSEn",
+            "book 18_192.jpg": "1bbgI1Zyj9Ow5kAqMm3ziZTr3Am6_xLxp",
+            "book 18_193.jpg": "1AFkIfBNzvnhS6uTRlHbpj1QYD8e3vD8D",
+            "book 18_194.jpg": "1IolFsIXh45xPDeWgjh9gHmAQYurqjQny",
+            "book 18_195.jpg": "1KTMiBo14m91ydNq5gTs-GIa83_eLzg07",
+            "book 18_196.jpg": "1FsIUmSxO_c2wrH56l79NzvNI8KLumsw8",
+            "book 18_197.jpg": "1YlXaifNptxKktZ0-v6FYYxxjFj2oWFBb",
+            "book 18_198.jpg": "1oHhWhGKhQfegNewGcSikD38SItx2-czy",
+            "book 18_199.jpg": "1mW0uNH-SOqL3Lr3047q6MWGU_nKEbBHf",
+            "book 18_200.jpg": "1uKnC9ibvrnV_dygPQLHEOFA3ReG56HlU",
+            "book 18_201.jpg": "1KvcKjJULbf7zAoSr8sD76v1iWH3JBvWv",
+            "book 18_202.jpg": "1-wlFczVrlbsbhjYS45QkC1bNeaVCxef-",
+            "book 18_203.jpg": "1UUbVaJm7jop6Z5O_xsop_jV-MSGP-N8n",
+            "book 18_204.jpg": "1hmLDPDCub1QMenupTFhglBFBpdnwXg5S",
+            "book 18_205.jpg": "1A7-h5zRSKUgUv-79BcSR4Wiadc-iq29L",
+            "book 18_206.jpg": "1l1R_ootaFWqsiPjdb_Z1fAzTBGLOFJKg",
+            "book 18_207.jpg": "1UF-Wt0Q2dhifT6B-xh2_zHfs02dgxwXu",
+            "book 18_208.jpg": "1ndIfjZxY4XpEpWAldUORjdVDE7dzFaFp",
+            "book 18_209.jpg": "1G8BkGZemLL6giD1M03Ei4bcVRQ97KOh3",
+            "book 18_210.jpg": "1D6Z9Mvt0xaZfSoR5Qoj_plCVA3Ovs9b6",
+            "book 18_211.jpg": "1gui3C0GP4UzUP6wW9vCAQMFzqeOF9_NJ",
+            "book 18_212.jpg": "1dHDKBbMJuFzhPyTWtK6btrU2sqz44waH",
+            "book 18_213.jpg": "1XXjCniOOioL8lrrvGZELssdYzLuQyaGg",
+            "book 18_214.jpg": "1IU6Vnx8noOq068tdiSnrETlX52LTlsgw",
+            "book 18_215.jpg": "1DeQaaUo8g9ZwICPOw68wZYQzfcnTz3R5",
+            "book 18_216.jpg": "14rYE7SToHiG4ZS36Ofw7ndhO4qOv8jzw",
+            "book 18_217.jpg": "1cllgqr4Dsv59pHZXSYk3ofqNvyX6V7rB",
+            "book 18_218.jpg": "1tzkYU9txOEA2sDcYhThWrPGBLkFoHKE9",
+            "book 18_219.jpg": "1tYRlZwAgAFMkSI1GFbRMWWzoo8BUNIDS",
+            "book 18_220.jpg": "1Gw5heNjcDiDWIsn3zgulchKbHB_Wtd-4",
+            "book 18_221.jpg": "1sibsYnBMooGzZ0Tmn67523pU1yH3eLar",
+            "book 18_222.jpg": "1haoQ1RN3P8HEoL5xfgy7lOniVtKnJ3jP",
+            "book 18_223.jpg": "1OwPmqHq9irh-ma35uQGDpEzhtu8vkuy-",
+            "book 18_224.jpg": "1BiteZNfmWx0ZtLtGZBDrRA1GuaKTFPCJ",
+            "book 18_225.jpg": "1x5qp0B9JA8B3d-CAiZ8HpDt9Qs4uoPSr",
+            "book 18_226.jpg": "1iiSLBeja5urxRPBzRWzNUKSS26UjnMwT",
+            "book 18_227.jpg": "12N-y7C33jI-RZJe-UnVmvQfHOGddHZ_n",
+            "book 18_228.jpg": "1sn9JzCYsoq-tf6bhc4V6nQEwpQzCkb5C",
+            "book 18_229.jpg": "1MbmD6iVZUTxu_snGZDaOwwRtWxhh7cBT",
+            "book 18_230.jpg": "1DZQDh1fWjzScPVIiaNM8NbU5q5dZnf1X",
+            "book 18_231.jpg": "1W5qEsjmRganndbslKMwBu5i79prjixOp",
+            "book 18_232.jpg": "151bPrcCTv839yazgjVcHECQW-SrX2XZL",
+            "book 18_233.jpg": "14PBI0PojQXkF59S78ag46yvAC5MszR9l",
+            "book 18_234.jpg": "1RxYEo5lwPAk5vvUvcBbrGWn6EnTKLl3r",
+            "book 18_235.jpg": "1jYOonmG8doUYXo2Mc2pefoY-y-kbNfvM",
+            "book 18_236.jpg": "1xL593boe-PZIu2tcIwp2ZRcH9-QkHpXx",
+            "book 18_237.jpg": "1nXmsUJhcb_p7CuaV83w6L4qzpdOaHqPV",
+            "book 18_238.jpg": "1l_nLc3kr5TkwjK3D5q6QIoqm5N-my7qS",
+            "book 18_239.jpg": "1g7IFcyUQRLj-jbbYITUEQsT7-Of53Xzg",
+            "book 18_240.jpg": "1ztdfhZkjOsLVCRsETjkCThvkV1C_qSaa",
+            "book 18_241.jpg": "1MJOyAQKqo89pAp2c8RcALlN7TOFDBfwm",
+            "book 18_242.jpg": "1Uk41vP2M_uoCs63Olx5774gYjpvH11cL",
+            "book 18_243.jpg": "19eYt2PqR7_fjISkqY7SFACABkh08gZEY",
+            "book 18_244.jpg": "1tKVUsM5nSiScK-oDsVay4K7roaWjzrRX",
+            "book 18_245.jpg": "1DI26Y2M97py_ncVlmI2_UyoiRsBq4LZR",
+            "book 18_246.jpg": "1kCZhWkJSjK6p19olEHZOIkc4V9nAP4ze",
+            "book 18_247.jpg": "11ynMAXIx4aaRCuU8xtHPL2sGviKLyF5y",
+            "book 18_248.jpg": "1IXoGYLwAMTzlDii4wfl0uxEXrimNuIYX",
+            "book 18_249.jpg": "1mNTmfbFT4XlD3HQzliqAmU7t2hxLpi9S",
+            "book 18_250.jpg": "1n8nw7jJegFKAJnxcZPN7LbbocuYCsEUm",
+            "book 18_251.jpg": "13ZLNtRZjlqAykzdTC_fzYGem-_ymDcoT",
+            "book 18_252.jpg": "1dSvSEv4ZRWXdAkbwFbEKg2MW2OuDjdeZ",
+            "book 18_253.jpg": "1qkYXXhchMWos-saA7V9b5WxGhd69HxMN",
+            "book 18_254.jpg": "1L5NhId3vweQ6FgTDdGYRtzUZCITHDsDO",
+            "book 18_255.jpg": "1Ruh6kWwH1-TcxpNm9f_FNpSBPXsYhrPI",
+            "book 18_256.jpg": "1hClt-3cmtlEpTzEaro-qQ7JMx-G5Gtr7",
+            "book 18_257.jpg": "17yyvNTE7urMV5ByZPEDdjULKu_Of4jfO",
+            "book 18_258.jpg": "1FFYe3WPFVKDk5D2bEEgXHp-AC8g0bigH",
+            "book 18_259.jpg": "1NWufaqh8wxP0aEVTE8p3J9b1-IP_j2N_",
+            "book 18_260.jpg": "15FmuSAwiXpIHWS2O2KZaSQhD9dxr3waT",
+            "book 18_261.jpg": "1FUrmJ_ZE_buKYyGmSDpJsoh90c6LcoWK",
+            "book 18_262.jpg": "18y4P4EgmjYJ6J-r2Nm5HBf7DBF4jUayc",
+            "book 18_263.jpg": "1CIpEDFtgJsGJVN1DiYs8B9gpdExU_Znu",
+            "book 18_264.jpg": "1CNOUS8Oa2WN9yat35DkLsdlpOa2GY-ly",
+            "book 18_265.jpg": "1vITIoJm4H5nmARRqeRbd4h-03nZX2Mct",
+            "book 18_266.jpg": "1zCSpr3BPRI7_qtEB5zTV7fd_rmuAl09m",
+            "book 18_267.jpg": "1WBdVTpn4wlkKKxoHIVqOLmC5zPPgTqzj",
+            "book 18_268.jpg": "1diJlxVnmexlh-296gX37p2hq07um6oVM",
+            "book 18_269.jpg": "1M_Mr5ywDDI9utt6m65ruzzYrMsVcFdkx",
+            "book 18_270.jpg": "1-CKSnfMMBM5x7dRZNEi-O1e8omn_ftoe",
+            "book 18_271.jpg": "1Uq6Rcet0QreRtKFH4UYS9XgzHUFLKl_I",
+            "book 18_272.jpg": "1vdkEDHP_mqqLEvI83yJETevTmhl3L9qu",
+            "book 18_273.jpg": "1EtJouee6R6Nly_QtwsxYlA8sdAsDNldE",
+            "book 18_274.jpg": "114U1aGs7U184B_dFwiUFD_MrQNA6-1aE",
+            "book 18_275.jpg": "1JApXmS3WMJ7r_7MHTTt9Qujju3658116",
+            "book 18_276.jpg": "1ecrgxDMHfm7rOFI5JOPVTUXbUyrUH7Kv",
+            "book 18_277.jpg": "1v9S0qmk3OvoieGz9N0EjUvA__sn-rrMy",
+            "book 18_278.jpg": "1-UJKKQ8tSuN6GK4Q2AiiSlhxmMF2WsFQ",
+            "book 18_279.jpg": "1bIHpR6iML8cSU4rePXiTmnsZXM6yE1Gt",
+            "book 18_280.jpg": "1uUruFHF9OE-jrMjzoASBFWuz1pARNJKn",
+            "book 18_281.jpg": "1ZcWUJDGloBQ2QH4hSLiSmskBbNiMTww7",
+            "book 18_282.jpg": "1uUgzEW5s9F54mBGZAWV9zkxiWMM4H-h1",
+            "book 18_283.jpg": "1McoVQMr8prYT7uuSaaVLmR-By9H8B7ZO",
+            "book 18_284.jpg": "1XEkN6ckT6JRrjVwiwqlcfrDp734zsaUt",
+            "book 18_285.jpg": "1FtyhZt-8m20YWkvjryIp4DPuNbDlqtE-",
+            "book 18_286.jpg": "10klXkFCj8YmFo84vFKqCWQla9n73NBPq",
+            "book 18_287.jpg": "1gGDvimy6Y81f4qLXD0428WjOwP9IDk1n",
+            "book 18_288.jpg": "1YqVqtpMCzSWB1T1g7dBkXx35PvC2UkSU"
+        };
+
+
+        function isDriveId(s) { return /^[A-Za-z0-9_-]{20,}$/.test(s); }
+
+        function driveUrlFromId(id) {
+            return 'https://lh3.googleusercontent.com/d/' + id + '=w2000';
+        }
+
+        // Construye la URL final de cada página
+        function getPageSrc(p) {
+            const name = p.img;
+            if (isDriveId(name)) return driveUrlFromId(name);
+            const id = DRIVE_ID_MAP[name] || DRIVE_ID_MAP[name + IMAGE_EXTENSION];
+            if (id) return driveUrlFromId(id);
+            return BASE_PATH + name + IMAGE_EXTENSION;
+        }
+
+        function registerDriveMap(map) {
+            Object.keys(map || {}).forEach(name => {
+                DRIVE_ID_MAP[name] = map[name];
+                const dot = name.lastIndexOf('.');
+                if (dot > 0) DRIVE_ID_MAP[name.slice(0, dot)] = map[name];
+            });
+            return Object.keys(DRIVE_ID_MAP).length;
+        }
+
+        function showDriveSetupError(msg) {
+            console.warn(msg);
+            const progress = document.getElementById('loadingProgress');
+            if (progress) progress.textContent = msg;
+            if (typeof showToast === 'function') showToast(msg);
+        }
+
+        function loadDriveFolderIndexJsonp() {
+            return new Promise((resolve, reject) => {
+                const cb = '__driveIndexCallback_' + Date.now();
+                const sep = DRIVE_INDEX_URL.includes('?') ? '&' : '?';
+                const script = document.createElement('script');
+                const timer = setTimeout(() => {
+                    cleanup();
+                    reject(new Error('No respondió el Apps Script. Revisa que esté publicado para Cualquier usuario.'));
+                }, 12000);
+                function cleanup() {
+                    clearTimeout(timer);
+                    delete window[cb];
+                    script.remove();
+                }
+                window[cb] = (map) => {
+                    const count = registerDriveMap(map);
+                    cleanup();
+                    resolve(count);
+                };
+                script.onerror = () => {
+                    cleanup();
+                    reject(new Error('No se pudo abrir la URL del Apps Script. Verifica que termine en /exec.'));
+                };
+                script.src = DRIVE_INDEX_URL + sep + 'callback=' + cb;
+                document.head.appendChild(script);
+            });
+        }
+
+        // Pide al Apps Script el mapa nombre→ID de toda la carpeta de Drive.
+        // Usa JSONP para evitar bloqueos CORS de Google al abrir el HTML.
+        async function loadDriveFolderIndex() {
+            // 1) Siempre cargamos el mapa incrustado primero, para que las
+            //    imágenes aparezcan aunque el navegador bloquee la llamada JSONP.
+            try {
+                if (typeof DRIVE_ID_MAP_EMBEDDED === 'object') registerDriveMap(DRIVE_ID_MAP_EMBEDDED);
+            } catch (e) { console.warn('No se pudo cargar el mapa incrustado', e); }
+
+            if (!DRIVE_INDEX_URL || DRIVE_INDEX_URL.includes('PEGA_AQUI')) {
+                return; // mapa incrustado es suficiente
+            }
+            // 2) Intentamos refrescar desde Apps Script (opcional). Si falla, no pasa nada.
+            try {
+                const count = await loadDriveFolderIndexJsonp();
+                if (count) console.log('Drive index actualizado:', count, 'entradas');
+            } catch (e) {
+                console.warn('Usando mapa incrustado (JSONP no disponible):', e.message);
+            }
+        }
+
+
+        let TOTAL_PAGES = PAGES.length;
+
+        let currentSpread = 0, isFlipping = false, currentZoom = 1, panMode = false;
+        let isPanning = false, panStartX = 0, panStartY = 0, panOffsetX = 0, panOffsetY = 0;
+
+        function getTotalSpreads() { return TOTAL_PAGES <= 1 ? 1 : 1 + Math.ceil((TOTAL_PAGES - 1) / 2); }
+        function getSpreadPages(s) {
+            if (s === 0) return { left: null, right: 0 };
+            const l = (s - 1) * 2 + 1, r = l + 1;
+            return { left: l < TOTAL_PAGES ? l : null, right: r < TOTAL_PAGES ? r : null };
+        }
+
+        // DOM
+        const leftPageImg = document.getElementById('leftPageImg');
+        const rightPageImg = document.getElementById('rightPageImg');
+        const leftPageEl = document.getElementById('leftPage');
+        const rightPageEl = document.getElementById('rightPage');
+        const flipContainer = document.getElementById('flipContainer');
+        const btnPrev = document.getElementById('btnPrev');
+        const btnNext = document.getElementById('btnNext');
+        const pageIndicator = document.getElementById('pageIndicator');
+        const toast = document.getElementById('toast');
+        const book = document.getElementById('book');
+        const loadingScreen = document.getElementById('loadingScreen');
+        const securityModal = document.getElementById('securityModal');
+        const sidebarPanel = document.getElementById('sidebarPanel');
+        const thumbList = document.getElementById('thumbList');
+        const zoomLevelEl = document.getElementById('zoomLevel');
+        const bookViewport = document.getElementById('bookViewport');
+        const bookTransformWrapper = document.getElementById('bookTransformWrapper');
+        const progressFill = document.getElementById('progressFill');
+        const modeIndicator = document.getElementById('modeIndicator');
+        const pageJumpInput = document.getElementById('pageJumpInput');
+
+        // PARTÍCULAS
+        function createParticles() {
+            const c = document.getElementById('particles');
+            for (let i = 0; i < 15; i++) {
+                const p = document.createElement('div'); p.className = 'particle';
+                const g = Math.random() > 0.5;
+                p.style.cssText = `left:${Math.random()*100}%;width:${2+Math.random()*3}px;height:${2+Math.random()*3}px;background:${g?'rgba(255,215,0,0.3)':'rgba(0,61,165,0.4)'};--duration:${14+Math.random()*20}s;--delay:${Math.random()*12}s;--opacity:${0.12+Math.random()*0.2};`;
+                c.appendChild(p);
+            }
+        }
+
+        // MARCA DE AGUA
+        function createWatermark(id) {
+            const c = document.getElementById(id); if (!c) return; c.innerHTML = '';
+            const t = 'ESCUELA DE IDIOMAS DEL EJERCITO';
+            for (let i = 0; i < 10; i++) { const l = document.createElement('div'); l.className = 'watermark-line'; for (let j = 0; j < 5; j++) { const s = document.createElement('span'); s.textContent = t; l.appendChild(s); } c.appendChild(l); }
+        }
+
+        // MINIATURAS
+        function createThumbnails() {
+            thumbList.innerHTML = '';
+            for (let i = 0; i < TOTAL_PAGES; i += 5) appendThumb(i);
+            if ((TOTAL_PAGES - 1) % 5 !== 0) appendThumb(TOTAL_PAGES - 1);
+        }
+        function appendThumb(idx) {
+            const p = PAGES[idx], d = document.createElement('div');
+            d.className = 'thumb-item'; d.dataset.index = idx;
+            d.innerHTML = `<img src="${getPageSrc(p)}" alt="${p.label}" draggable="false" loading="lazy"/><div class="thumb-label">${p.label}</div>`;
+            d.addEventListener('click', () => goToPage(idx)); thumbList.appendChild(d);
+        }
+        function updateThumbnails() {
+            const sp = getSpreadPages(currentSpread);
+            document.querySelectorAll('.thumb-item').forEach(t => t.classList.remove('active'));
+            [sp.left, sp.right].forEach(idx => { if (idx !== null) { const e = thumbList.querySelector(`[data-index="${idx}"]`); if (e) e.classList.add('active'); } });
+        }
+
+        // RENDERIZADO
+        function setPageImg(imgEl, pageEl, idx) {
+            if (idx !== null) {
+                const src = getPageSrc(PAGES[idx]);
+                imgEl.onerror = () => showDriveSetupError('No se pudo abrir: ' + PAGES[idx].img + '. Revisa que el nombre exista en Drive y que la carpeta sea pública.');
+                imgEl.onload = () => { imgEl.onerror = null; };
+                imgEl.src = src;
+                imgEl.style.display = 'block';
+                pageEl.classList.remove('empty-page');
+            } else {
+                imgEl.onerror = null;
+                imgEl.src = '';
+                imgEl.style.display = 'none';
+                pageEl.classList.add('empty-page');
+            }
+        }
+        function renderSpread(s) {
+            const sp = getSpreadPages(s);
+            setPageImg(leftPageImg, leftPageEl, sp.left);
+            setPageImg(rightPageImg, rightPageEl, sp.right);
+            const pn = []; if (sp.left !== null) pn.push(sp.left + 1); if (sp.right !== null) pn.push(sp.right + 1);
+            pageIndicator.textContent = `Pagina ${pn.join('-')} de ${TOTAL_PAGES}`;
+            const mp = Math.max(sp.left || 0, sp.right || 0);
+            progressFill.style.width = ((mp + 1) / TOTAL_PAGES * 100) + '%';
+            btnPrev.classList.toggle('disabled', s === 0);
+            btnNext.classList.toggle('disabled', s === getTotalSpreads() - 1);
+            updateThumbnails();
+        }
+
+        // =============================================
+        // VOLTEO REALISTA - AVANZAR (derecha a izquierda)
+        // =============================================
+        function flipForward() {
+            if (isFlipping) return;
+            if (currentSpread >= getTotalSpreads() - 1) return;
+            isFlipping = true;
+
+            const cur = getSpreadPages(currentSpread);
+            const nxt = getSpreadPages(currentSpread + 1);
+
+            // Crear hoja que voltea (mitad derecha, rota alrededor del lomo)
+            const flipEl = document.createElement('div');
+            flipEl.className = 'flip-page flip-right';
+
+            // Cara frontal: página derecha actual
+            const front = document.createElement('div'); front.className = 'flip-front';
+            if (cur.right !== null) front.innerHTML = `<img src="${getPageSrc(PAGES[cur.right])}" draggable="false" style="width:100%;height:100%;object-fit:contain;pointer-events:none;"/>`;
+            else front.style.background = 'linear-gradient(135deg,#1a2744,#0a1628)';
+            front.innerHTML += '<div class="fold-gradient-front"></div>';
+
+            // Cara trasera: nueva página izquierda
+            const back = document.createElement('div'); back.className = 'flip-back';
+            if (nxt.left !== null) back.innerHTML = `<img src="${getPageSrc(PAGES[nxt.left])}" draggable="false" style="width:100%;height:100%;object-fit:contain;pointer-events:none;"/>`;
+            else back.style.background = 'linear-gradient(135deg,#1a2744,#0a1628)';
+            back.innerHTML += '<div class="fold-gradient-back"></div>';
+
+            // Marca de agua en cara trasera
+            const wmId = 'wmF' + Date.now();
+            const wm = document.createElement('div'); wm.className = 'watermark-overlay'; wm.id = wmId;
+            back.appendChild(wm);
+
+            flipEl.appendChild(front); flipEl.appendChild(back);
+            flipContainer.appendChild(flipEl);
+            createWatermark(wmId);
+
+            // Sombra bajo la página que se revela (lado derecho)
+            const shadowUnder = document.createElement('div');
+            shadowUnder.className = 'flip-under-shadow on-right';
+            book.appendChild(shadowUnder);
+
+            // Sombra proyectada en la página izquierda
+            const shadowCast = document.createElement('div');
+            shadowCast.className = 'flip-cast-shadow to-left';
+            book.appendChild(shadowCast);
+
+            // Actualizar página derecha debajo con la nueva
+            setPageImg(rightPageImg, rightPageEl, nxt.right);
+
+            // Iniciar animación
+            requestAnimationFrame(() => flipEl.classList.add('flipping-forward'));
+
+            flipEl.addEventListener('animationend', () => {
+                setPageImg(leftPageImg, leftPageEl, nxt.left);
+                flipEl.remove(); shadowUnder.remove(); shadowCast.remove();
+                currentSpread++; renderSpread(currentSpread); isFlipping = false;
+            });
+        }
+
+        // =============================================
+        // VOLTEO REALISTA - RETROCEDER (izquierda a derecha)
+        // =============================================
+        function flipBackward() {
+            if (isFlipping) return;
+            if (currentSpread <= 0) return;
+            isFlipping = true;
+
+            const cur = getSpreadPages(currentSpread);
+            const prv = getSpreadPages(currentSpread - 1);
+
+            // Crear hoja que voltea (mitad izquierda, rota alrededor del lomo)
+            const flipEl = document.createElement('div');
+            flipEl.className = 'flip-page flip-left';
+
+            // Cara frontal: página izquierda actual
+            const front = document.createElement('div'); front.className = 'flip-front';
+            if (cur.left !== null) front.innerHTML = `<img src="${getPageSrc(PAGES[cur.left])}" draggable="false" style="width:100%;height:100%;object-fit:contain;pointer-events:none;"/>`;
+            else front.style.background = 'linear-gradient(135deg,#1a2744,#0a1628)';
+            front.innerHTML += '<div class="fold-gradient-front"></div>';
+
+            // Cara trasera: página derecha anterior
+            const back = document.createElement('div'); back.className = 'flip-back';
+            if (prv.right !== null) back.innerHTML = `<img src="${getPageSrc(PAGES[prv.right])}" draggable="false" style="width:100%;height:100%;object-fit:contain;pointer-events:none;"/>`;
+            else back.style.background = 'linear-gradient(135deg,#1a2744,#0a1628)';
+            back.innerHTML += '<div class="fold-gradient-back"></div>';
+
+            const wmId = 'wmB' + Date.now();
+            const wm = document.createElement('div'); wm.className = 'watermark-overlay'; wm.id = wmId;
+            back.appendChild(wm);
+
+            flipEl.appendChild(front); flipEl.appendChild(back);
+            flipContainer.appendChild(flipEl);
+            createWatermark(wmId);
+
+            // Sombra bajo la página que se revela (lado izquierdo)
+            const shadowUnder = document.createElement('div');
+            shadowUnder.className = 'flip-under-shadow on-left';
+            book.appendChild(shadowUnder);
+
+            // Sombra proyectada en la página derecha
+            const shadowCast = document.createElement('div');
+            shadowCast.className = 'flip-cast-shadow to-right';
+            book.appendChild(shadowCast);
+
+            // Actualizar página izquierda debajo con la anterior
+            setPageImg(leftPageImg, leftPageEl, prv.left);
+
+            // Iniciar animación: rota de 0° a 180° (izquierda → derecha)
+            requestAnimationFrame(() => flipEl.classList.add('flipping-backward'));
+
+            flipEl.addEventListener('animationend', () => {
+                setPageImg(rightPageImg, rightPageEl, prv.right);
+                flipEl.remove(); shadowUnder.remove(); shadowCast.remove();
+                currentSpread--; renderSpread(currentSpread); isFlipping = false;
+            });
+        }
+
+        function goToPage(idx) {
+            if (isFlipping) return;
+            idx = Math.max(0, Math.min(TOTAL_PAGES - 1, idx));
+            currentSpread = Math.min(idx === 0 ? 0 : Math.ceil(idx / 2), getTotalSpreads() - 1);
+            renderSpread(currentSpread); sidebarPanel.classList.add('closed');
+        }
+
+        // ZOOM Y PAN
+        function setZoom(lv) {
+            currentZoom = Math.max(0.5, Math.min(4, lv));
+            applyTransform(); zoomLevelEl.textContent = Math.round(currentZoom * 100) + '%';
+            if (currentZoom <= 1) { panOffsetX = 0; panOffsetY = 0; applyTransform(); }
+        }
+        function applyTransform() { bookTransformWrapper.style.transform = `translate(${panOffsetX}px,${panOffsetY}px) scale(${currentZoom})`; }
+        function resetView() { currentZoom = 1; panOffsetX = 0; panOffsetY = 0; applyTransform(); zoomLevelEl.textContent = '100%'; }
+        function togglePanMode() {
+            panMode = !panMode;
+            document.getElementById('btnPan').classList.toggle('active-tool', panMode);
+            bookViewport.classList.toggle('pan-mode', panMode);
+            if (panMode) { modeIndicator.classList.add('visible'); setTimeout(() => modeIndicator.classList.remove('visible'), 2000); }
+            else modeIndicator.classList.remove('visible');
+        }
+
+        bookViewport.addEventListener('mousedown', e => { if (!panMode || currentZoom <= 1) return; e.preventDefault(); isPanning = true; panStartX = e.clientX - panOffsetX; panStartY = e.clientY - panOffsetY; bookViewport.classList.add('panning'); bookTransformWrapper.classList.add('no-transition'); });
+        window.addEventListener('mousemove', e => { if (!isPanning) return; panOffsetX = e.clientX - panStartX; panOffsetY = e.clientY - panStartY; applyTransform(); });
+        window.addEventListener('mouseup', () => { if (isPanning) { isPanning = false; bookViewport.classList.remove('panning'); bookTransformWrapper.classList.remove('no-transition'); } });
+
+        let tSX = 0, tSY = 0, tPSX = 0, tPSY = 0, isTP = false;
+        bookViewport.addEventListener('touchstart', e => { if (!panMode || currentZoom <= 1 || e.touches.length !== 1) return; isTP = true; tSX = e.touches[0].clientX; tSY = e.touches[0].clientY; tPSX = panOffsetX; tPSY = panOffsetY; bookTransformWrapper.classList.add('no-transition'); }, { passive: true });
+        bookViewport.addEventListener('touchmove', e => { if (!isTP) return; e.preventDefault(); panOffsetX = tPSX + (e.touches[0].clientX - tSX); panOffsetY = tPSY + (e.touches[0].clientY - tSY); applyTransform(); }, { passive: false });
+        bookViewport.addEventListener('touchend', () => { isTP = false; bookTransformWrapper.classList.remove('no-transition'); });
+        bookViewport.addEventListener('wheel', e => { e.preventDefault(); setZoom(currentZoom + (e.deltaY > 0 ? -0.08 : 0.08)); }, { passive: false });
+
+        document.getElementById('rightPage').addEventListener('click', () => { if (!panMode) flipForward(); });
+        document.getElementById('leftPage').addEventListener('click', () => { if (!panMode) flipBackward(); });
+
+        let toastTO;
+        function showToast(m) { toast.textContent = m; toast.classList.add('visible'); clearTimeout(toastTO); toastTO = setTimeout(() => toast.classList.remove('visible'), 3000); }
+
+        // SEGURIDAD
+        document.addEventListener('contextmenu', e => { e.preventDefault(); showToast('Clic derecho deshabilitado por seguridad'); });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'F12') { e.preventDefault(); showToast('Herramientas de desarrollador bloqueadas'); return; }
+            if (e.ctrlKey && e.shiftKey && ['I','J','C','i','j','c'].includes(e.key)) { e.preventDefault(); showToast('Herramientas bloqueadas'); return; }
+            if (e.ctrlKey && 'uU'.includes(e.key)) { e.preventDefault(); showToast('Codigo fuente protegido'); return; }
+            if (e.ctrlKey && 'sS'.includes(e.key)) { e.preventDefault(); openSaveModal(); return; }
+            if (e.ctrlKey && 'pP'.includes(e.key)) { e.preventDefault(); showToast('Impresion deshabilitada'); return; }
+            if (e.ctrlKey && 'aA'.includes(e.key)) { e.preventDefault(); return; }
+            if (e.ctrlKey && 'cC'.includes(e.key)) { e.preventDefault(); showToast('Copia deshabilitada'); return; }
+            if (e.key === 'PrintScreen') { e.preventDefault(); document.getElementById('mainArea').classList.add('blur-protection'); setTimeout(() => document.getElementById('mainArea').classList.remove('blur-protection'), 2000); showToast('Captura bloqueada'); return; }
+            if (fabricCanvas && fabricCanvas.getActiveObject()) { /* mover objeto, no pasar pagina */ }
+            else if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); flipForward(); }
+            else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); flipBackward(); }
+            if (e.key === 'Home') { e.preventDefault(); currentSpread = 0; renderSpread(0); }
+            if (e.key === 'End') { e.preventDefault(); currentSpread = getTotalSpreads() - 1; renderSpread(currentSpread); }
+            if ('+='.includes(e.key)) { e.preventDefault(); setZoom(currentZoom + 0.1); }
+            if ('-_'.includes(e.key)) { e.preventDefault(); setZoom(currentZoom - 0.1); }
+            if (e.key === '0' && e.ctrlKey) { e.preventDefault(); resetView(); }
+        });
+        document.addEventListener('copy', e => { e.preventDefault(); showToast('Copia deshabilitada'); });
+        document.addEventListener('visibilitychange', () => { if (document.hidden) document.getElementById('mainArea').classList.add('blur-protection'); else setTimeout(() => document.getElementById('mainArea').classList.remove('blur-protection'), 500); });
+        window.addEventListener('blur', () => document.getElementById('mainArea').classList.add('blur-protection'));
+        window.addEventListener('focus', () => setTimeout(() => document.getElementById('mainArea').classList.remove('blur-protection'), 300));
+        document.addEventListener('dragstart', e => e.preventDefault());
+        document.addEventListener('touchstart', e => { if (e.target.tagName === 'IMG') e.preventDefault(); }, { passive: false });
+
+        // UI
+        btnPrev.addEventListener('click', flipBackward);
+        btnNext.addEventListener('click', flipForward);
+        document.getElementById('btnFullscreen').addEventListener('click', () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); else document.exitFullscreen(); });
+        document.getElementById('btnZoomIn').addEventListener('click', () => setZoom(currentZoom + 0.15));
+        document.getElementById('btnZoomOut').addEventListener('click', () => setZoom(currentZoom - 0.15));
+        document.getElementById('btnFitPage').addEventListener('click', resetView);
+        document.getElementById('btnPan').addEventListener('click', togglePanMode);
+        document.getElementById('btnThumbs').addEventListener('click', () => sidebarPanel.classList.toggle('closed'));
+        document.getElementById('btnCloseSidebar').addEventListener('click', () => sidebarPanel.classList.add('closed'));
+        document.getElementById('btnAcceptSecurity').addEventListener('click', () => securityModal.style.display = 'none');
+        document.getElementById('btnJump').addEventListener('click', () => { const v = parseInt(pageJumpInput.value); if (!isNaN(v) && v >= 1 && v <= TOTAL_PAGES) goToPage(v - 1); else showToast('Numero entre 1 y ' + TOTAL_PAGES); });
+        pageJumpInput.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('btnJump').click(); if (!/[0-9]/.test(e.key) && !['Backspace','Delete','ArrowLeft','ArrowRight','Tab'].includes(e.key)) e.preventDefault(); });
+
+        function centerBook() {
+            const r = bookViewport.getBoundingClientRect();
+            document.getElementById('bookContainerWrapper').style.cssText = `margin:auto;padding-top:${Math.max(10, (r.height - 500) / 2)}px;padding-left:${Math.max(10, (r.width - 720) / 2)}px;`;
+        }
+
+        async function init() {
+            createParticles(); createWatermark('watermarkLeft'); createWatermark('watermarkRight');
+            await loadDriveFolderIndex();
+            createThumbnails(); centerBook(); renderSpread(0);
+            let ld = 0; const pc = Math.min(4, TOTAL_PAGES);
+            for (let i = 0; i < pc; i++) { const im = new Image(); im.onload = im.onerror = () => { ld++; document.getElementById('loadingProgress').textContent = `Cargando pagina ${ld} de ${pc}...`; if (ld >= pc) setTimeout(() => { loadingScreen.classList.add('fade-out'); setTimeout(() => loadingScreen.style.display = 'none', 800); }, 300); }; im.src = getPageSrc(PAGES[i]); }
+            setTimeout(() => { loadingScreen.classList.add('fade-out'); setTimeout(() => loadingScreen.style.display = 'none', 800); }, 5000);
+            window.addEventListener('resize', centerBook);
+        }
+        
+        // =====================================================================
+        // === MEJORAS DIDÁCTICAS: Anotaciones, Audio, Guardado ================
+        // =====================================================================
+        const LS_KEY_ANNO   = 'emi_book_annotations_v1';
+        const LS_KEY_AUDIO  = 'emi_book_audios_v1';
+
+        // ---------- Helpers de almacenamiento ----------
+        function lsGet(k, def) { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } }
+        function lsSet(k, v)   { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+
+
+        // ---------- Sistema de anotación con Fabric.js ----------
+        let fabricCanvas = null;
+        let currentTool = 'select';
+        let currentColor = '#000000';
+        // Colores por defecto por herramienta: negro para dibujar, amarillo para resaltar
+        const toolColors = { pen: '#000000', highlight: '#FFD700' };
+        let currentFontFamily = 'Source Sans Pro';
+        let currentFontSize = 22;
+        let currentBold = false;
+        let currentItalic = false;
+        let annoActive = false;
+        const annotations = lsGet(LS_KEY_ANNO, {}); // { spreadIdx: fabricJSON }
+
+        function initFabricCanvas() {
+          const wrap = document.getElementById('annoCanvasWrap');
+          const canvasEl = document.getElementById('annoCanvas');
+          const book = document.getElementById('book');
+          canvasEl.width = book.offsetWidth;
+          canvasEl.height = book.offsetHeight;
+          // Nitidez maxima: escalar canvas por devicePixelRatio
+          if (window.fabric) fabric.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2);
+          fabricCanvas = new fabric.Canvas('annoCanvas', {
+            isDrawingMode: false, selection: true,
+            preserveObjectStacking: true,
+            enableRetinaScaling: true,
+            imageSmoothingEnabled: true,
+            renderOnAddRemove: true,
+          });
+          // Asegurar que el backing store del canvas se escale a alta resolucion
+          (function hiDpi(){
+            const c = canvasEl;
+            const ctx = c.getContext('2d');
+            const dpr = Math.max(window.devicePixelRatio || 1, 2);
+            if (ctx && 'imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high';
+          })();
+          fabricCanvas.setWidth(book.offsetWidth);
+          fabricCanvas.setHeight(book.offsetHeight);
+          fabricCanvas.freeDrawingBrush.color = currentColor;
+          fabricCanvas.freeDrawingBrush.width = 3;
+
+          fabricCanvas.on('object:added', saveCurrentAnnotations);
+          fabricCanvas.on('object:modified', saveCurrentAnnotations);
+          fabricCanvas.on('object:removed', saveCurrentAnnotations);
+
+          // Click para insertar texto / nota / formas
+          fabricCanvas.on('mouse:down', (opt) => {
+            if (currentTool === 'text') addTextAt(opt.pointer);
+            else if (currentTool === 'note') addNoteAt(opt.pointer);
+            else if (currentTool === 'link') addLinkAt(opt.pointer);
+            else if (currentTool === 'rect') addRectAt(opt.pointer);
+            else if (currentTool === 'arrow') addArrowAt(opt.pointer);
+          });
+        }
+
+        function resizeFabricCanvas() {
+          if (!fabricCanvas) return;
+          const book = document.getElementById('book');
+          fabricCanvas.setWidth(book.offsetWidth);
+          fabricCanvas.setHeight(book.offsetHeight);
+          fabricCanvas.renderAll();
+        }
+
+        function setTool(tool) {
+          currentTool = tool;
+          // Aplicar color por defecto de la herramienta (negro dibujar / amarillo resaltar)
+          if (tool === 'pen') currentColor = toolColors.pen;
+          else if (tool === 'highlight') currentColor = toolColors.highlight;
+          document.querySelectorAll('.anno-btn[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+          const wrap = document.getElementById('annoCanvasWrap');
+          if (wrap) {
+            wrap.className = wrap.className.replace(/\btool-\S+/g, '').trim();
+            wrap.classList.add('tool-' + tool);
+          }
+          syncSwatchUI();
+          updateToolIndicator(tool);
+          if (!fabricCanvas) return;
+          fabricCanvas.isDrawingMode = (tool === 'pen' || tool === 'highlight');
+          if (tool === 'pen') {
+            fabricCanvas.freeDrawingBrush.color = toolColors.pen;
+            fabricCanvas.freeDrawingBrush.width = 3;
+          } else if (tool === 'highlight') {
+            fabricCanvas.freeDrawingBrush.color = toolColors.highlight + '55';
+            fabricCanvas.freeDrawingBrush.width = 14;
+          }
+          if (tool === 'eraser') {
+            const obj = fabricCanvas.getActiveObject();
+            if (obj) fabricCanvas.remove(obj);
+          }
+        }
+
+        // Mantener sincronizado el indicador de color (punto + swatch activo)
+        function syncSwatchUI(){
+          const dot = document.getElementById('paletteDot');
+          if (dot) dot.style.background = currentColor;
+          const cc = (currentColor || '').toLowerCase();
+          document.querySelectorAll('.anno-color').forEach(x =>
+            x.classList.toggle('active', (x.dataset.color || '').toLowerCase() === cc));
+        }
+
+        function addTextAt(p) {
+          // Texto Arial 8, AZUL EMI por defecto, fondo transparente.
+          // Crece de IZQUIERDA a DERECHA como una caja de texto normal (LTR).
+          const FONT_FAMILY = 'Arial, Helvetica, sans-serif';
+          const FONT_SIZE = 8;
+          const FONT_COLOR = '#003DA5';
+
+          const t = new fabric.IText('', {
+            left: p.x, top: p.y,
+            originX: 'left', originY: 'center',
+            textAlign: 'left',
+            direction: 'ltr',
+            fontSize: FONT_SIZE,
+            fill: FONT_COLOR,
+            fontFamily: FONT_FAMILY,
+            fontWeight: 'normal',
+            fontStyle: 'normal',
+            editable: true,
+            backgroundColor: 'transparent',
+            textBackgroundColor: 'transparent',
+            padding: 0,
+            cornerColor: '#003DA5',
+            cornerStyle: 'circle',
+            cornerSize: 6,
+            borderColor: '#003DA5',
+            transparentCorners: false,
+            shadow: null,
+            objectCaching: true,
+            statefullCache: false,
+            noScaleCache: false,
+          });
+          fabricCanvas.add(t);
+          fabricCanvas.setActiveObject(t);
+          t.enterEditing();
+          if (t.hiddenTextarea) t.hiddenTextarea.focus();
+          t.on('editing:exited', () => {
+            if (!t.text || !t.text.trim()) {
+              fabricCanvas.remove(t);
+            }
+            setTool('select');
+          });
+        }
+
+        function addNoteAt(p) {
+          const r = new fabric.Rect({ width: 160, height: 100, fill: '#FFF59D', stroke: '#F9A825', strokeWidth: 1, rx: 4, ry: 4, shadow: '2px 4px 6px rgba(0,0,0,0.3)' });
+          const t = new fabric.Textbox('Nota...', {
+            width: 150, fontSize: currentFontSize, fill: '#333', top: 8, left: 8,
+            fontFamily: currentFontFamily,
+            fontWeight: currentBold ? 'bold' : 'normal',
+            fontStyle: currentItalic ? 'italic' : 'normal',
+          });
+          const g = new fabric.Group([r, t], { left: p.x, top: p.y, subTargetCheck: true });
+          fabricCanvas.add(g); setTool('select');
+        }
+        function addRectAt(p) {
+          const r = new fabric.Rect({ left: p.x, top: p.y, width: 120, height: 80, fill: 'transparent', stroke: currentColor, strokeWidth: 3 });
+          fabricCanvas.add(r); setTool('select');
+        }
+        function addArrowAt(p) {
+          const line = new fabric.Line([p.x, p.y, p.x + 120, p.y], { stroke: currentColor, strokeWidth: 3 });
+          const tri = new fabric.Triangle({ left: p.x + 120, top: p.y - 7, width: 14, height: 14, angle: 90, fill: currentColor });
+          const g = new fabric.Group([line, tri]);
+          fabricCanvas.add(g); setTool('select');
+        }
+        // Cuadro de enlace: se coloca exactamente donde se hace clic y queda clicable en el PDF
+        function addLinkAt(p) {
+          const raw = (document.getElementById('annoLinkUrl').value || '').trim();
+          const url = getLinkUrlValue();
+          if (!url) { showToast('Escribe una URL en el cuadro de enlace'); setTool('select'); return; }
+          const label = raw || url;
+          const t = new fabric.IText(label, {
+            left: p.x, top: p.y, originX: 'center', originY: 'center',
+            fontSize: 12, fill: '#1d4ed8',
+            fontFamily: 'Arial, Helvetica, sans-serif',
+            underline: true, editable: true,
+            cornerColor: '#003DA5', cornerStyle: 'circle', cornerSize: 6,
+            borderColor: '#003DA5', transparentCorners: false,
+          });
+          t.data = { url: url, isLink: true };
+          fabricCanvas.add(t);
+          fabricCanvas.setActiveObject(t);
+          fabricCanvas.requestRenderAll();
+          showToast('Enlace insertado: ' + url);
+          setTool('select');
+        }
+
+        // Índice del spread que el canvas tiene cargado AHORA (puede diferir de currentSpread
+        // durante el cambio de página). Evita que una anotación se copie a otras páginas.
+        let _canvasSpread = 0;
+        function saveCurrentAnnotations() {
+          if (!fabricCanvas) return;
+          const json = fabricCanvas.toJSON(['data']);
+          const objs = fabricCanvas.getObjects();
+          if (objs.length) {
+            annotations[_canvasSpread] = json;
+          } else {
+            delete annotations[_canvasSpread];
+          }
+          lsSet(LS_KEY_ANNO, annotations);
+          updateAnnoBadges();
+        }
+        function loadAnnotationsForSpread() {
+          if (!fabricCanvas) return;
+          _canvasSpread = currentSpread;
+          const data = annotations[currentSpread];
+          fabricCanvas.clear();
+          if (data) fabricCanvas.loadFromJSON(data, () => fabricCanvas.renderAll());
+          else fabricCanvas.renderAll();
+        }
+        function updateAnnoBadges() {
+          // Marcar miniaturas con anotación
+          document.querySelectorAll('.thumb-item .badge-anno').forEach(b => b.remove());
+        }
+
+        function toggleAnnoMode() {
+          annoActive = !annoActive;
+          document.getElementById('annoToolbar').classList.toggle('hidden', !annoActive);
+          document.getElementById('annoCanvasWrap').classList.toggle('active', annoActive);
+          document.getElementById('btnTools').classList.toggle('active-tool', annoActive);
+          if (annoActive) {
+            if (!fabricCanvas) initFabricCanvas();
+            resizeFabricCanvas();
+            loadAnnotationsForSpread();
+            showToast('Modo anotación activado');
+          } else {
+            saveCurrentAnnotations();
+            showToast('Modo anotación desactivado');
+          }
+        }
+
+        // Hooks: cuando cambia de spread, guardar/cargar anotaciones
+        const _origRenderSpread = renderSpread;
+        renderSpread = function (s) {
+          if (fabricCanvas) saveCurrentAnnotations();
+          _origRenderSpread(s);
+          if (fabricCanvas) {
+            resizeFabricCanvas();
+            loadAnnotationsForSpread();
+          }
+        };
+
+        // ---------- Audio: grabar / reproducir ----------
+        let mediaRecorder = null, recChunks = [], audios = lsGet(LS_KEY_AUDIO, {}); // {spread:[{name,dataUrl}]}
+
+        async function toggleRecord() {
+          const status = document.getElementById('recStatus');
+          if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop(); return;
+          }
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            recChunks = [];
+            mediaRecorder.ondataavailable = e => recChunks.push(e.data);
+            mediaRecorder.onstop = async () => {
+              stream.getTracks().forEach(t => t.stop());
+              const blob = new Blob(recChunks, { type: 'audio/webm' });
+              const reader = new FileReader();
+              reader.onload = () => {
+                if (!audios[currentSpread]) audios[currentSpread] = [];
+                audios[currentSpread].push({
+                  name: 'Audio ' + (audios[currentSpread].length + 1),
+                  dataUrl: reader.result, ts: Date.now(),
+                });
+                lsSet(LS_KEY_AUDIO, audios);
+                document.getElementById('recStatus').innerHTML = 'Guardado ✓';
+                document.getElementById('btnRecAudio').innerHTML = '<i class="fas fa-microphone"></i>';
+                showToast('Audio guardado en esta página');
+              };
+              reader.readAsDataURL(blob);
+            };
+            mediaRecorder.start();
+            status.innerHTML = '<span class="rec-dot" style="display:inline-block"></span> Grabando...';
+            document.getElementById('btnRecAudio').innerHTML = '<i class="fas fa-stop"></i>';
+          } catch (e) {
+            showToast('No se pudo acceder al micrófono: ' + e.message);
+          }
+        }
+
+        function renderAudioList() {
+          const c = document.getElementById('audioListContainer'); c.innerHTML = '';
+          const list = audios[currentSpread] || [];
+          if (!list.length) { c.innerHTML = '<p style="opacity:.6;font-size:13px;">No hay audios en esta página todavía.</p>'; return; }
+          list.forEach((a, i) => {
+            const row = document.createElement('div'); row.className = 'audio-row';
+            row.innerHTML = `<span style="min-width:60px">${a.name}</span><audio controls src="${a.dataUrl}"></audio>
+              <button title="Descargar" data-dl="${i}"><i class="fas fa-download"></i></button>
+              <button title="Eliminar" data-rm="${i}"><i class="fas fa-trash"></i></button>`;
+            c.appendChild(row);
+          });
+          c.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => {
+            audios[currentSpread].splice(+b.dataset.rm, 1); lsSet(LS_KEY_AUDIO, audios); renderAudioList();
+          });
+          c.querySelectorAll('[data-dl]').forEach(b => b.onclick = () => {
+            const a = audios[currentSpread][+b.dataset.dl];
+            const link = document.createElement('a'); link.href = a.dataUrl; link.download = a.name.replace(/\s/g,'_') + '.webm'; link.click();
+          });
+        }
+
+        // ---------- Guardar como PNG / PDF ----------
+        async function captureSpread(scale = 2) {
+          // Pausar anotación visualmente para captura limpia
+          const wrap = document.getElementById('annoCanvasWrap');
+          const wasActive = wrap.classList.contains('active');
+          wrap.classList.remove('active');
+          // Ocultar la marca de agua dorada en pantalla: al guardar SOLO debe quedar
+          // la marca de agua en escala de grises (se añade después de la captura).
+          const wms = Array.from(document.querySelectorAll('.watermark-overlay'));
+          wms.forEach(w => { w.dataset._prevDisp = w.style.display; w.style.display = 'none'; });
+          const target = document.getElementById('book');
+          let canvas;
+          try {
+            // html2canvas no captura <canvas> de Fabric correctamente si está vacío, pero sí su contenido renderizado
+            canvas = await html2canvas(target, { scale, useCORS: true, allowTaint: true, backgroundColor: null, logging: false });
+          } finally {
+            wms.forEach(w => { w.style.display = w.dataset._prevDisp || ''; delete w.dataset._prevDisp; });
+            if (wasActive) wrap.classList.add('active');
+          }
+          return canvas;
+        }
+
+        async function doSave() {
+          const nameRaw = (document.getElementById('saveName').value || 'pagina').trim();
+          const safeName = nameRaw.replace(/[^\w\-.\sáéíóúÁÉÍÓÚñÑ]/g, '_');
+          const fmt = document.getElementById('saveFormat').value;
+          const scale = parseInt(document.getElementById('saveQuality').value) || 2;
+          showToast('Generando archivo...');
+          try {
+            if (fmt === 'png') {
+              const c = await captureSpread(scale);
+              const link = document.createElement('a');
+              link.download = safeName + '.png'; link.href = c.toDataURL('image/png'); link.click();
+            } else if (fmt === 'pdf') {
+              const c = await captureSpread(scale);
+              const { jsPDF } = window.jspdf;
+              const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [c.width, c.height] });
+              pdf.addImage(c.toDataURL('image/png'), 'PNG', 0, 0, c.width, c.height);
+              pdf.save(safeName + '.pdf');
+            } else if (fmt === 'pdf-all') {
+              const { jsPDF } = window.jspdf;
+              const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: 'a4' });
+              const spreads = Object.keys(annotations).map(n => +n).sort((a, b) => a - b);
+              if (!spreads.length) { showToast('No hay páginas anotadas todavía'); return; }
+              for (let i = 0; i < spreads.length; i++) {
+                currentSpread = spreads[i]; renderSpread(currentSpread);
+                await new Promise(r => setTimeout(r, 600)); // dar tiempo a cargar imágenes
+                const c = await captureSpread(scale);
+                const w = pdf.internal.pageSize.getWidth();
+                const h = (c.height / c.width) * w;
+                if (i > 0) pdf.addPage();
+                pdf.addImage(c.toDataURL('image/png'), 'PNG', 0, 0, w, h);
+              }
+              pdf.save(safeName + '.pdf');
+            }
+            showToast('✓ Archivo descargado');
+            document.getElementById('saveModal').classList.remove('visible');
+          } catch (e) {
+            console.error(e); showToast('Error al guardar: ' + e.message);
+          }
+        }
+
+        function openSaveModal() {
+          document.getElementById('saveName').value = 'mi_trabajo_pag_' + (currentSpread + 1);
+          document.getElementById('saveModal').classList.add('visible');
+        }
+
+        // ---------- Wire up de los botones ----------
+        // Helpers para aplicar estilo de texto al objeto seleccionado
+        function applyTextStyleToSelection(prop, val) {
+          if (!fabricCanvas) return;
+          const o = fabricCanvas.getActiveObject(); if (!o) return;
+          const setOn = (obj) => { if (obj && obj.set && ('text' in obj || obj.type === 'i-text' || obj.type === 'textbox' || obj.type === 'text')) obj.set(prop, val); };
+          if (o.type === 'group' && o.getObjects) o.getObjects().forEach(setOn); else setOn(o);
+          fabricCanvas.requestRenderAll();
+        }
+
+        const fontFamilySel = document.getElementById('annoFontFamily');
+        const fontSizeSel = document.getElementById('annoFontSize');
+        fontFamilySel.value = currentFontFamily;
+        fontSizeSel.value = String(currentFontSize);
+        fontFamilySel.onchange = () => {
+          currentFontFamily = fontFamilySel.value;
+          applyTextStyleToSelection('fontFamily', currentFontFamily);
+        };
+        fontSizeSel.onchange = () => {
+          currentFontSize = parseInt(fontSizeSel.value, 10) || 22;
+          applyTextStyleToSelection('fontSize', currentFontSize);
+        };
+        document.getElementById('annoBold').onclick = () => {
+          currentBold = !currentBold;
+          document.getElementById('annoBold').classList.toggle('active', currentBold);
+          applyTextStyleToSelection('fontWeight', currentBold ? 'bold' : 'normal');
+        };
+        document.getElementById('annoItalic').onclick = () => {
+          currentItalic = !currentItalic;
+          document.getElementById('annoItalic').classList.toggle('active', currentItalic);
+          applyTextStyleToSelection('fontStyle', currentItalic ? 'italic' : 'normal');
+        };
+
+
+        document.getElementById('btnTools').onclick = toggleAnnoMode;
+        document.querySelectorAll('.anno-btn[data-tool]').forEach(b => b.onclick = () => setTool(b.dataset.tool));
+        document.querySelectorAll('.anno-color').forEach(c => c.onclick = () => {
+          document.querySelectorAll('.anno-color').forEach(x => x.classList.remove('active'));
+          c.classList.add('active');
+          currentColor = c.dataset.color;
+          // Recordar el color elegido para la herramienta activa
+          if (currentTool === 'pen') toolColors.pen = currentColor;
+          else if (currentTool === 'highlight') toolColors.highlight = currentColor;
+          if (fabricCanvas) {
+            fabricCanvas.freeDrawingBrush.color = currentTool === 'highlight' ? currentColor + '55' : currentColor;
+            const o = fabricCanvas.getActiveObject();
+            if (o && o.set) { o.set('fill', currentColor); if (o.stroke) o.set('stroke', currentColor); fabricCanvas.renderAll(); }
+          }
+        });
+        document.getElementById('annoUndo').onclick = () => {
+          if (!fabricCanvas) return;
+          const objs = fabricCanvas.getObjects(); if (objs.length) { fabricCanvas.remove(objs[objs.length - 1]); }
+        };
+        document.getElementById('annoClear').onclick = () => {
+          if (!fabricCanvas) return;
+          if (!confirm('¿Borrar todas las anotaciones de esta página?')) return;
+          fabricCanvas.clear(); delete annotations[currentSpread]; lsSet(LS_KEY_ANNO, annotations);
+        };
+
+        document.getElementById('btnAudio').onclick = () => document.getElementById('audioPanel').classList.toggle('visible');
+        document.getElementById('btnRecAudio').onclick = toggleRecord;
+        document.getElementById('btnCloseAudio').onclick = () => document.getElementById('audioPanel').classList.remove('visible');
+        document.getElementById('btnShowAudios').onclick = () => { renderAudioList(); document.getElementById('audioListModal').classList.add('visible'); };
+
+        document.getElementById('btnSave').onclick = openSaveModal;
+        document.getElementById('btnDoSave').onclick = doSave;
+
+        // Cerrar modales
+        document.querySelectorAll('.emi-modal [data-close]').forEach(b => b.onclick = (e) => e.target.closest('.emi-modal').classList.remove('visible'));
+        document.querySelectorAll('.emi-modal').forEach(m => m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); });
+
+        // Atajo de teclado: T para alternar herramientas
+        // Flechas: mover el objeto seleccionado en el canvas (cuando hay seleccion)
+        document.addEventListener('keydown', e => {
+          if (e.target.matches('input,textarea')) return;
+          if (e.key === 't' || e.key === 'T') { e.preventDefault(); toggleAnnoMode(); }
+
+          // Mover objeto seleccionado con flechas
+          if (fabricCanvas) {
+            const obj = fabricCanvas.getActiveObject();
+            // No interferir si el usuario esta editando texto
+            const editing = obj && obj.isEditing;
+            if (obj && !editing && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+              e.preventDefault();
+              e.stopPropagation();
+              const step = e.shiftKey ? 10 : 1;
+              if (e.key === 'ArrowUp')    obj.top  = (obj.top  || 0) - step;
+              if (e.key === 'ArrowDown')  obj.top  = (obj.top  || 0) + step;
+              if (e.key === 'ArrowLeft')  obj.left = (obj.left || 0) - step;
+              if (e.key === 'ArrowRight') obj.left = (obj.left || 0) + step;
+              obj.setCoords();
+              fabricCanvas.requestRenderAll();
+              fabricCanvas.fire('object:modified', { target: obj });
+            }
+          }
+        }, true);
+
+        // Resize canvas al redimensionar ventana
+        window.addEventListener('resize', () => { if (fabricCanvas) resizeFabricCanvas(); });
+
+
+        // ===== Paleta desplegable =====
+        (function(){
+          const btn = document.getElementById('btnPalette');
+          const pop = document.getElementById('colorsPopup');
+          if (btn && pop) {
+            // Sacar el popup del toolbar para que su overflow no lo recorte
+            document.body.appendChild(pop);
+            function positionPop(){
+              const r = btn.getBoundingClientRect();
+              let left = r.right + 10;
+              const popW = pop.offsetWidth || 140;
+              if (left + popW > window.innerWidth) left = r.left - popW - 10;
+              pop.style.left = Math.max(8, left) + 'px';
+              pop.style.top  = Math.max(8, Math.min(r.top - 6, window.innerHeight - 180)) + 'px';
+            }
+            btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              pop.classList.toggle('open');
+              if (pop.classList.contains('open')) positionPop();
+            });
+            document.addEventListener('click', (e) => {
+              if (!pop.contains(e.target) && e.target !== btn && !btn.contains(e.target)) pop.classList.remove('open');
+            });
+            window.addEventListener('resize', () => { if (pop.classList.contains('open')) positionPop(); });
+          }
+        })();
+
+        // ===== Sincronizar dot del color seleccionado y cerrar popup al elegir =====
+        function syncPaletteDot(){
+          const d = document.getElementById('paletteDot');
+          if (d) d.style.background = currentColor;
+        }
+        document.querySelectorAll('.anno-color').forEach(c => {
+          c.addEventListener('click', () => {
+            setTimeout(syncPaletteDot, 0);
+            const pop = document.getElementById('colorsPopup');
+            if (pop) pop.classList.remove('open');
+          });
+        });
+
+        // ===== Indicador flotante de herramienta =====
+        let toolIndicator = null;
+        function ensureIndicator(){
+          if (!toolIndicator) {
+            toolIndicator = document.createElement('div');
+            toolIndicator.className = 'tool-cursor-indicator';
+            document.body.appendChild(toolIndicator);
+          }
+          return toolIndicator;
+        }
+        const TOOL_ICONS = {
+          select:'fa-mouse-pointer', pen:'fa-pen', highlight:'fa-highlighter',
+          text:'fa-font', note:'fa-sticky-note', rect:'far fa-square',
+          arrow:'fa-long-arrow-alt-right', eraser:'fa-eraser', link:'fa-link'
+        };
+        function updateToolIndicator(tool){
+          const el = ensureIndicator();
+          if (!tool || tool==='select') { el.style.display='none'; return; }
+          const icon = TOOL_ICONS[tool] || 'fa-pen';
+          el.innerHTML = '<i class="' + (icon.startsWith('far') ? icon : 'fas ' + icon) + '"></i>';
+          el.style.background = currentColor;
+          el.style.color = (currentColor.toLowerCase()==='#ffffff' || currentColor.toLowerCase()==='#ffd700') ? '#000' : '#fff';
+        }
+        document.addEventListener('mousemove', (e) => {
+          if (!toolIndicator || toolIndicator.style.display==='none') return;
+          const wrap = document.getElementById('annoCanvasWrap');
+          const r = wrap ? wrap.getBoundingClientRect() : null;
+          if (r && e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom) {
+            toolIndicator.style.display='flex';
+            toolIndicator.style.left = e.clientX + 'px';
+            toolIndicator.style.top  = e.clientY + 'px';
+          } else {
+            toolIndicator.style.display='none';
+          }
+        });
+
+        // Resincronizar indicador cuando cambia el color
+        const _origSetColor = null;
+        document.querySelectorAll('.anno-color').forEach(c => c.addEventListener('click', () => {
+          setTimeout(() => updateToolIndicator(currentTool), 0);
+        }));
+
+        // ===== Tecla SUPRIMIR / DELETE para borrar objeto seleccionado =====
+        document.addEventListener('keydown', (e) => {
+          if (e.target.matches('input,textarea')) return;
+          if (!fabricCanvas) return;
+          if (e.key !== 'Delete' && !(e.key === 'Backspace' && e.shiftKey)) return;
+          const objs = fabricCanvas.getActiveObjects();
+          const editing = objs.some(o => o.isEditing);
+          if (editing) return;
+          if (objs.length) {
+            e.preventDefault();
+            objs.forEach(o => fabricCanvas.remove(o));
+            fabricCanvas.discardActiveObject();
+            fabricCanvas.requestRenderAll();
+            saveCurrentAnnotations();
+            showToast('Elemento eliminado');
+          }
+        }, true);
+
+        // ===== Insertar enlace web =====
+        function getLinkUrlValue(){
+          let v = (document.getElementById('annoLinkUrl').value || '').trim();
+          if (!v) return '';
+          if (!/^https?:\/\//i.test(v)) {
+            if (/\s/.test(v) || !/\./.test(v)) {
+              v = 'https://www.google.com/search?q=' + encodeURIComponent(v);
+            } else {
+              v = 'https://' + v;
+            }
+          }
+          return v;
+        }
+        const _btnSearch = document.getElementById('annoLinkSearch');
+        if (_btnSearch) _btnSearch.addEventListener('click', () => {
+          const u = getLinkUrlValue();
+          if (!u) { showToast('Escribe una URL o término'); return; }
+          window.open(u, '_blank', 'noopener');
+        });
+        const _btnInsertLink = document.getElementById('annoLinkInsert');
+        if (_btnInsertLink) _btnInsertLink.addEventListener('click', () => {
+          if (!fabricCanvas) { showToast('Activa el modo anotación (T)'); return; }
+          const url = getLinkUrlValue();
+          if (!url) { showToast('Escribe una URL o término'); return; }
+          // Activar la herramienta de enlace para colocarlo exactamente donde se haga clic
+          setTool('link');
+          showToast('Haz clic en la página donde colocar el enlace');
+        });
+
+        // ===== Marca de agua overlay para PNG/PDF (escala de grises, transparente) =====
+        function drawWatermarkOnCanvas(canvas){
+          const ctx = canvas.getContext('2d');
+          ctx.save();
+          ctx.globalAlpha = 0.15;
+          ctx.fillStyle = '#555555';
+          ctx.translate(canvas.width/2, canvas.height/2);
+          ctx.rotate(-35 * Math.PI/180);
+          const text = 'ESCUELA DE IDIOMAS DEL EJERCITO';
+          const fontSize = Math.max(14, Math.round(canvas.width/55));
+          ctx.font = '900 ' + fontSize + 'px "Playfair Display", serif';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          const stepY = fontSize * 2.4;
+          const stepX = ctx.measureText(text).width + fontSize * 0.8;
+          const w = canvas.width * 2, h = canvas.height * 2;
+          for (let y = -h; y < h; y += stepY) {
+            const offset = (Math.round(y/stepY) % 2 === 0) ? 0 : stepX/2;
+            for (let x = -w + offset; x < w; x += stepX) {
+              ctx.fillText(text, x, y);
+            }
+          }
+          ctx.restore();
+        }
+
+        // Envolver captureSpread original para añadir marca de agua y links de PDF
+        const _origCaptureSpread = captureSpread;
+        captureSpread = async function(scale){
+          const c = await _origCaptureSpread(scale);
+          drawWatermarkOnCanvas(c);
+          return c;
+        };
+
+        // Hook a doSave para añadir links clicables en PDF
+        const _origJsPDFAdd = window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.prototype.addImage;
+        // Mejor: interceptamos después - reemplazo de doSave con manejo de enlaces
+        const _origDoSave = doSave;
+        doSave = async function(){
+          // Antes de guardar, deshabilitamos la modificación: solo añadimos links después.
+          const fmtSel = document.getElementById('saveFormat').value;
+          if (fmtSel !== 'pdf') return _origDoSave();
+          // Para PDF: replicamos lógica con links
+          const nameRaw = (document.getElementById('saveName').value || 'pagina').trim();
+          const safeName = nameRaw.replace(/[^\w\-.\sáéíóúÁÉÍÓÚñÑ]/g, '_');
+          const scale = parseInt(document.getElementById('saveQuality').value) || 2;
+          showToast('Generando PDF...');
+          try {
+            const c = await captureSpread(scale);
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [c.width, c.height] });
+            pdf.addImage(c.toDataURL('image/png'), 'PNG', 0, 0, c.width, c.height);
+            // Añadir links clicables a partir de objetos Fabric con data.url
+            if (fabricCanvas) {
+              const book = document.getElementById('book');
+              const sx = c.width  / book.offsetWidth;
+              const sy = c.height / book.offsetHeight;
+              fabricCanvas.getObjects().forEach(o => {
+                if (o.data && o.data.url) {
+                  const r = o.getBoundingRect(true, true);
+                  const x = r.left * sx;
+                  const y = r.top  * sy;
+                  const w = r.width  * sx;
+                  const h = r.height * sy;
+                  try { pdf.link(x, y, w, h, { url: o.data.url }); } catch(e){}
+                }
+              });
+            }
+            pdf.save(safeName + '.pdf');
+            showToast('PDF guardado');
+          } catch(e){ showToast('Error: ' + e.message); }
+        };
+
+        init();
+    </script>
+</body>
+</html>
